@@ -71,3 +71,11 @@ textarea { display:block; width:100%; min-height:100px; margin-top:5px; }
   .toolbar { flex-direction:column; }
   .topbar { padding:15px; }
 }
+
+/* V2 visual upgrade */
+body{background:linear-gradient(180deg,#f2f7f5 0,#f8faf9 280px)}
+.topbar{box-shadow:0 6px 18px rgba(22,61,54,.08)}
+.hero{box-shadow:0 16px 35px rgba(47,94,85,.16)}
+.kpi,.card,.queueCard,.tableWrap{box-shadow:0 8px 24px rgba(34,75,66,.055)}
+.kpi{transition:transform .18s ease,box-shadow .18s ease}.kpi:hover{transform:translateY(-2px);box-shadow:0 12px 28px rgba(34,75,66,.10)}
+.tab{font-weight:700}.tab.active{box-shadow:0 8px 18px rgba(47,94,85,.18)}

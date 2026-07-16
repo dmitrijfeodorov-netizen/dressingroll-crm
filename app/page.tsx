@@ -195,7 +195,7 @@ export default function Home() {
       <header className="topbar">
         <div>
           <div className="brand">DressingRoll CRM</div>
-          <div className="subtitle">B2B clinic sales control</div>
+          <div className="subtitle">B2B Sales Command Centre</div>
         </div>
         <div className="headerActions">
           <button className="ghostButton" onClick={exportCsv}>Export CSV</button>
@@ -221,7 +221,7 @@ export default function Home() {
           <>
             <section className="hero">
               <div>
-                <h1>Good day, Dmitrij.</h1>
+                <h1>Good day, Dmitrij. Your sales command centre is ready.</h1>
                 <p>{Math.min(25, counts.ready)} new clinics, {counts.follow} follow-ups and {counts.replies} active replies are visible.</p>
               </div>
               <button className="startButton" onClick={startToday}>START TODAY</button>
