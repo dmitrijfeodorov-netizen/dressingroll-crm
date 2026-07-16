@@ -1,7 +1,11 @@
-# DressingRoll CRM V2
+# DressingRoll CRM V3
 
-Updated visual version of the live CRM.
+V3 adds:
+- Clinic detail drawer
+- Activity history
+- Quick status buttons
+- Separate queues for follow-ups, samples and customers
+- Improved daily workflow
 
-Upload all files to the root of the existing GitHub repository and replace matching files. Vercel will redeploy automatically.
-
-Current storage is browser localStorage. Supabase cloud database and secure login are the next stage.
+Upload all files to the existing GitHub repository and replace matching files.
+Vercel will redeploy automatically.

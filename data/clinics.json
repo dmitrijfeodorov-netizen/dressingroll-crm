@@ -20,7 +20,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 2,
@@ -43,7 +44,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 3,
@@ -66,7 +68,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 4,
@@ -89,7 +92,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 5,
@@ -112,7 +116,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 6,
@@ -135,7 +140,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 7,
@@ -158,7 +164,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 8,
@@ -181,7 +188,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 9,
@@ -204,7 +212,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 10,
@@ -227,7 +236,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 11,
@@ -250,7 +260,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 12,
@@ -273,7 +284,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 13,
@@ -296,7 +308,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 14,
@@ -319,7 +332,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 15,
@@ -342,7 +356,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 16,
@@ -365,7 +380,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 17,
@@ -388,7 +404,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 18,
@@ -411,7 +428,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 19,
@@ -434,7 +452,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 20,
@@ -457,7 +476,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 21,
@@ -480,7 +500,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 22,
@@ -503,7 +524,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 23,
@@ -526,7 +548,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 24,
@@ -549,7 +572,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 25,
@@ -572,7 +596,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 26,
@@ -595,7 +620,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 27,
@@ -618,7 +644,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 28,
@@ -641,7 +668,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 29,
@@ -664,7 +692,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 30,
@@ -687,7 +716,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 31,
@@ -710,7 +740,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 32,
@@ -733,7 +764,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 33,
@@ -756,7 +788,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 34,
@@ -779,7 +812,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 35,
@@ -802,7 +836,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 36,
@@ -825,7 +860,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 37,
@@ -848,7 +884,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 38,
@@ -871,7 +908,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 39,
@@ -894,7 +932,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 40,
@@ -917,7 +956,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 41,
@@ -940,7 +980,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 42,
@@ -963,7 +1004,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 43,
@@ -986,7 +1028,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 44,
@@ -1009,7 +1052,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 45,
@@ -1032,7 +1076,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 46,
@@ -1055,7 +1100,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 47,
@@ -1078,7 +1124,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 48,
@@ -1101,7 +1148,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 49,
@@ -1124,7 +1172,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 50,
@@ -1147,7 +1196,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 51,
@@ -1170,7 +1220,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 52,
@@ -1193,7 +1244,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 53,
@@ -1216,7 +1268,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 54,
@@ -1239,7 +1292,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 55,
@@ -1262,7 +1316,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 56,
@@ -1285,7 +1340,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 57,
@@ -1308,7 +1364,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 58,
@@ -1331,7 +1388,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 59,
@@ -1354,7 +1412,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 60,
@@ -1377,7 +1436,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 61,
@@ -1400,7 +1460,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 62,
@@ -1423,7 +1484,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 63,
@@ -1446,7 +1508,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 64,
@@ -1469,7 +1532,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 65,
@@ -1492,7 +1556,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 66,
@@ -1515,7 +1580,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 67,
@@ -1538,7 +1604,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 68,
@@ -1561,7 +1628,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 69,
@@ -1584,7 +1652,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 70,
@@ -1607,7 +1676,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 71,
@@ -1630,7 +1700,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 72,
@@ -1653,7 +1724,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 73,
@@ -1676,7 +1748,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 74,
@@ -1699,7 +1772,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 75,
@@ -1722,7 +1796,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 76,
@@ -1745,7 +1820,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 77,
@@ -1768,7 +1844,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 78,
@@ -1791,7 +1868,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 79,
@@ -1814,7 +1892,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 80,
@@ -1837,7 +1916,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 81,
@@ -1860,7 +1940,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 82,
@@ -1883,7 +1964,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 83,
@@ -1906,7 +1988,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 84,
@@ -1929,7 +2012,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 85,
@@ -1952,7 +2036,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 86,
@@ -1975,7 +2060,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 87,
@@ -1998,7 +2084,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 88,
@@ -2021,7 +2108,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 89,
@@ -2044,7 +2132,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 90,
@@ -2067,7 +2156,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 91,
@@ -2090,7 +2180,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 92,
@@ -2113,7 +2204,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 93,
@@ -2136,7 +2228,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 94,
@@ -2159,7 +2252,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 95,
@@ -2182,7 +2276,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 96,
@@ -2205,7 +2300,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 97,
@@ -2228,7 +2324,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 98,
@@ -2251,7 +2348,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 99,
@@ -2274,7 +2372,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 100,
@@ -2297,7 +2396,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 101,
@@ -2320,7 +2420,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 102,
@@ -2343,7 +2444,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 103,
@@ -2366,7 +2468,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 104,
@@ -2389,7 +2492,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 105,
@@ -2412,7 +2516,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 106,
@@ -2435,7 +2540,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 107,
@@ -2458,7 +2564,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 108,
@@ -2481,7 +2588,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 109,
@@ -2504,7 +2612,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 110,
@@ -2527,7 +2636,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 111,
@@ -2550,7 +2660,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 112,
@@ -2573,7 +2684,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 113,
@@ -2596,7 +2708,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 114,
@@ -2619,7 +2732,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 115,
@@ -2642,7 +2756,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 116,
@@ -2665,7 +2780,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 117,
@@ -2688,7 +2804,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 118,
@@ -2711,7 +2828,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 119,
@@ -2734,7 +2852,8 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 120,
@@ -2757,7 +2876,8 @@
     "customer": "No",
     "nextAction": "Find email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   },
   {
     "id": 121,
@@ -2780,6 +2900,7 @@
     "customer": "No",
     "nextAction": "Send first email",
     "nextActionDate": "",
-    "notes": ""
+    "notes": "",
+    "history": []
   }
 ]
