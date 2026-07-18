@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import seedClinics from "../data/clinics.json";
-
+import { supabase } from "../lib/supabase";
 type HistoryItem = { date:string; action:string; note?:string };
 type Clinic = {
-  id:number; name:string; region:string; city:string; postcode:string; phone:string;
+  id:string; name:string; region:string; city:string; postcode:string; phone:string;
   email:string; website:string; services:string; description:string; source:string;
   priority:string; status:string; firstEmailDate:string; followUpDate:string;
   lastReplyDate:string; sampleStatus:string; customer:string; nextAction:string;
   nextActionDate:string; notes:string; history:HistoryItem[];
 };
 
-const STORAGE_KEY="dressingroll_crm_v3";
 const statuses=["Needs Email","Ready to Email","Email Sent","Follow-up Due","Replied","Interested","Sample Requested","Sample Sent","Quote Sent","First Order","Repeat Customer","Not Interested","Invalid Email","Do Not Contact"];
 const iso=(d=new Date())=>d.toISOString().slice(0,10);
 const plusDays=(date:string,days:number)=>{const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return iso(d);};
@@ -48,27 +46,118 @@ Dmitrij Feodorov
 DressingRoll`;
 }
 
+
+const OWNER_ID = "4fe3eb83-7c50-4eee-8af7-4a550dacecd9";
+
+type ClinicRow = {
+  id:string;
+  clinic_name:string;
+  email:string|null;
+  phone:string|null;
+  website:string|null;
+  city:string|null;
+  county:string|null;
+  postcode:string|null;
+  source_reference:string|null;
+  status:string;
+  priority:string;
+  last_contacted_at:string|null;
+  next_follow_up_at:string|null;
+};
+
+function rowToClinic(row:ClinicRow):Clinic {
+  const hasEmail=Boolean(row.email);
+  const nextDate=row.next_follow_up_at?.slice(0,10) || "";
+  let status=row.status || (hasEmail ? "Ready to Email" : "Needs Email");
+
+  if(status==="research") status=hasEmail ? "Ready to Email" : "Needs Email";
+  if(status==="Email Sent" && nextDate && nextDate<=iso()) status="Follow-up Due";
+
+  let priority=row.priority || "B";
+  if(priority==="normal") priority=hasEmail ? "A" : "C";
+  if(priority==="high") priority="A";
+  if(priority==="low") priority="C";
+
+  return {
+    id:row.id,
+    name:row.clinic_name,
+    region:row.county || "",
+    city:row.city || "",
+    postcode:row.postcode || "",
+    phone:row.phone || "",
+    email:row.email || "",
+    website:row.website || "",
+    services:"",
+    description:"",
+    source:row.source_reference || "",
+    priority,
+    status,
+    firstEmailDate:row.last_contacted_at?.slice(0,10) || "",
+    followUpDate:nextDate,
+    lastReplyDate:"",
+    sampleStatus:"Not sent",
+    customer:"No",
+    nextAction:status==="Needs Email" ? "Find email" : status==="Ready to Email" ? "Send first email" : "",
+    nextActionDate:nextDate,
+    notes:"",
+    history:[],
+  };
+}
+
+function clinicToRow(c:Clinic) {
+  return {
+    clinic_name:c.name,
+    email:c.email || null,
+    phone:c.phone || null,
+    website:c.website || null,
+    city:c.city || null,
+    county:c.region || null,
+    postcode:c.postcode || null,
+    source_reference:c.source || null,
+    status:c.status,
+    priority:c.priority,
+    last_contacted_at:c.firstEmailDate ? `${c.firstEmailDate}T12:00:00Z` : null,
+    next_follow_up_at:c.followUpDate ? `${c.followUpDate}T12:00:00Z` : null,
+    updated_at:new Date().toISOString(),
+  };
+}
+
 export default function Home(){
-  const [clinics,setClinics]=useState<Clinic[]>(seedClinics as Clinic[]);
+
+  const [clinics,setClinics]=useState<Clinic[]>([]);
   const [loaded,setLoaded]=useState(false);
   const [section,setSection]=useState("dashboard");
   const [query,setQuery]=useState("");
   const [statusFilter,setStatusFilter]=useState("");
   const [priorityFilter,setPriorityFilter]=useState("");
-  const [queue,setQueue]=useState<number[]>([]);
+  const [queue,setQueue]=useState<string[]>([]);
   const [queueIndex,setQueueIndex]=useState(0);
-  const [selectedId,setSelectedId]=useState<number|null>(null);
+  const [selectedId,setSelectedId]=useState<string|null>(null);
   const [sidebarOpen,setSidebarOpen]=useState(false);
 
-  useEffect(()=>{const saved=localStorage.getItem(STORAGE_KEY);if(saved)setClinics(JSON.parse(saved));setLoaded(true)},[]);
-  useEffect(()=>{if(loaded)localStorage.setItem(STORAGE_KEY,JSON.stringify(clinics))},[clinics,loaded]);
-
   useEffect(()=>{
-    if(!loaded)return;
-    const today=iso();
-    setClinics(current=>current.map(c=>c.status==="Email Sent"&&c.followUpDate&&c.followUpDate<=today
-      ? addHistory({...c,status:"Follow-up Due",nextAction:"Send follow-up",nextActionDate:today},"Follow-up became due"):c));
-  },[loaded]);
+    async function loadClinics(){
+      setLoaded(false);
+
+      const {data,error}=await supabase
+        .from("clinics")
+        .select("id,clinic_name,email,phone,website,city,county,postcode,source_reference,status,priority,last_contacted_at,next_follow_up_at")
+        .eq("owner_id",OWNER_ID)
+        .order("clinic_name");
+
+      if(error){
+        console.error("Unable to load clinics:",error);
+        alert(`Unable to load clinics: ${error.message}`);
+        setLoaded(true);
+        return;
+      }
+
+      setClinics((data as ClinicRow[]).map(rowToClinic));
+      setLoaded(true);
+    }
+
+    loadClinics();
+  },[]);
 
   const metrics=useMemo(()=>({
     total:clinics.length,
@@ -95,8 +184,24 @@ export default function Home(){
     return filtered;
   },[section,clinics,filtered]);
 
-  function updateClinic(id:number, updater:(c:Clinic)=>Clinic){
-    setClinics(list=>list.map(c=>c.id===id?updater(c):c));
+  async function updateClinic(id:string, updater:(c:Clinic)=>Clinic){
+    const existing=clinics.find(c=>c.id===id);
+    if(!existing)return;
+
+    const updated=updater(existing);
+    setClinics(list=>list.map(c=>c.id===id?updated:c));
+
+    const {error}=await supabase
+      .from("clinics")
+      .update(clinicToRow(updated))
+      .eq("id",id)
+      .eq("owner_id",OWNER_ID);
+
+    if(error){
+      console.error("Unable to save clinic:",error);
+      alert(`Unable to save clinic: ${error.message}`);
+      setClinics(list=>list.map(c=>c.id===id?existing:c));
+    }
   }
 
   function buildQueue(){
@@ -217,7 +322,7 @@ export default function Home(){
       </main>
     </div>
 
-    {selected&&<ClinicDrawer clinic={selected} onClose={()=>setSelectedId(null)} onUpdate={updated=>setClinics(list=>list.map(c=>c.id===updated.id?updated:c))} onQuick={quickStatus}/>}
+    {selected&&<ClinicDrawer clinic={selected} onClose={()=>setSelectedId(null)} onUpdate={updated=>updateClinic(updated.id,()=>updated)} onQuick={quickStatus}/>}
   </div>;
 }
 
