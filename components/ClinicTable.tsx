@@ -58,6 +58,7 @@ export default function ClinicTable({
         <table>
           <thead>
             <tr>
+              <th style={{ width: "44px", textAlign: "center" }}>#</th>
               <th>Clinic</th>
               <th>Email</th>
               <th>City</th>
@@ -69,8 +70,9 @@ export default function ClinicTable({
             </tr>
           </thead>
           <tbody>
-            {clinics.map((c) => (
+            {clinics.map((c, index) => (
               <tr key={c.id}>
+                <td style={{ width: "44px", textAlign: "center", fontWeight: 600 }}>{index + 1}</td>
                 <td>
                   <b>{c.name}</b>
                   <small>{c.region}</small>

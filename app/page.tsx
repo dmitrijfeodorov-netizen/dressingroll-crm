@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "../lib/supabase";
+import { fetchAllOwnerClinics, supabase } from "../lib/supabase";
 type HistoryItem = { date:string; action:string; note?:string };
 type Clinic = {
   id:string; name:string; region:string; city:string; postcode:string; phone:string;
@@ -125,6 +125,7 @@ function clinicToRow(c:Clinic) {
 export default function Home(){
 
   const [clinics,setClinics]=useState<Clinic[]>([]);
+  const [dashboardRows,setDashboardRows]=useState<ClinicRow[]>([]);
   const [loaded,setLoaded]=useState(false);
   const [section,setSection]=useState("dashboard");
   const [query,setQuery]=useState("");
@@ -139,35 +140,41 @@ export default function Home(){
     async function loadClinics(){
       setLoaded(false);
 
-      const {data,error}=await supabase
-        .from("clinics")
-        .select("id,clinic_name,email,phone,website,city,county,postcode,source_reference,status,priority,last_contacted_at,next_follow_up_at")
-        .eq("owner_id",OWNER_ID)
-        .order("clinic_name");
-
-      if(error){
-        console.error("Unable to load clinics:",error);
-        alert(`Unable to load clinics: ${error.message}`);
+      try {
+        const rows=(await fetchAllOwnerClinics(OWNER_ID)) as ClinicRow[];
+        setDashboardRows(rows);
+        setClinics(rows.map(rowToClinic));
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("Unable to load clinics:", error);
+        alert(`Unable to load clinics: ${message}`);
+      } finally {
         setLoaded(true);
-        return;
       }
-
-      setClinics((data as ClinicRow[]).map(rowToClinic));
-      setLoaded(true);
     }
 
     loadClinics();
   },[]);
 
-  const metrics=useMemo(()=>({
-    total:clinics.length,
-    ready:clinics.filter(c=>c.status==="Ready to Email").length,
-    sent:clinics.filter(c=>c.status==="Email Sent").length,
-    follow:clinics.filter(c=>c.status==="Follow-up Due").length,
-    replies:clinics.filter(c=>["Replied","Interested"].includes(c.status)).length,
-    samples:clinics.filter(c=>["Sample Requested","Sample Sent"].includes(c.status)).length,
-    customers:clinics.filter(c=>["First Order","Repeat Customer"].includes(c.customer)).length,
-  }),[clinics]);
+  const metrics=useMemo(()=>{
+    const normalized=dashboardRows.map(rowToClinic);
+    const ready=normalized.filter((clinic)=>clinic.status==="Ready to Email").length;
+    const sent=normalized.filter((clinic)=>clinic.status==="Email Sent").length;
+    const follow=normalized.filter((clinic)=>clinic.status==="Follow-up Due").length;
+    const replies=normalized.filter((clinic)=>["Replied","Interested"].includes(clinic.status)).length;
+    const samples=normalized.filter((clinic)=>["Sample Requested","Sample Sent"].includes(clinic.status)).length;
+    const customers=normalized.filter((clinic)=>["First Order","Repeat Customer"].includes(clinic.status)).length;
+
+    return {
+      total:normalized.length,
+      ready,
+      sent,
+      follow,
+      replies,
+      samples,
+      customers,
+    };
+  }, [dashboardRows]);
 
   const current=queue.length?clinics.find(c=>c.id===queue[queueIndex]):undefined;
   const selected=selectedId?clinics.find(c=>c.id===selectedId):undefined;
@@ -317,7 +324,7 @@ export default function Home(){
 
         {["clinics","followups","samples","customers"].includes(section)&&<>
           <div className="filters"><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search clinic, city or email…"/><select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="">All statuses</option>{statuses.map(s=><option key={s}>{s}</option>)}</select><select value={priorityFilter} onChange={e=>setPriorityFilter(e.target.value)}><option value="">All priorities</option><option>A</option><option>B</option><option>C</option></select></div>
-          <div className="tablePanel"><table><thead><tr><th>Clinic</th><th>Email</th><th>City</th><th>Priority</th><th>Status</th><th>Next Action</th><th>Date</th><th></th></tr></thead><tbody>{sectionRows.map(c=><tr key={c.id}><td><b>{c.name}</b><small>{c.region}</small></td><td>{c.email||"—"}</td><td>{c.city}</td><td><span className={`pill p${c.priority}`}>{c.priority}</span></td><td>{c.status}</td><td>{c.nextAction}</td><td>{c.nextActionDate}</td><td><button onClick={()=>setSelectedId(c.id)}>Open</button></td></tr>)}</tbody></table></div>
+          <div className="tablePanel"><table><thead><tr><th style={{width:"50px",textAlign:"center"}}>#</th><th>Clinic</th><th>Email</th><th>City</th><th>Priority</th><th>Status</th><th>Next Action</th><th>Date</th><th></th></tr></thead><tbody>{sectionRows.map((c,index)=><tr key={c.id}><td style={{width:"50px",textAlign:"center",fontWeight:600}}>{index+1}</td><td><b>{c.name}</b><small>{c.region}</small></td><td>{c.email||"—"}</td><td>{c.city}</td><td><span className={`pill p${c.priority}`}>{c.priority}</span></td><td>{c.status}</td><td>{c.nextAction}</td><td>{c.nextActionDate}</td><td><button onClick={()=>setSelectedId(c.id)}>Open</button></td></tr>)}</tbody></table></div>
         </>}
       </main>
     </div>
