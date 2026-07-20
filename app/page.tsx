@@ -61,6 +61,16 @@ type ClinicNote = {
   created_at:string;
 };
 
+type ReceivedReply = {
+  id:string;
+  owner_id:string;
+  clinic_id:string;
+  sender:string;
+  subject:string;
+  body_text:string;
+  received_at:string;
+};
+
 type Contact = {
   id:string;
   clinic_id:string;
@@ -1057,6 +1067,8 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [notesLoading,setNotesLoading]=useState(false);
   const [noteText,setNoteText]=useState("");
   const [noteSaving,setNoteSaving]=useState(false);
+  const [receivedReplies,setReceivedReplies]=useState<ReceivedReply[]>([]);
+  const [receivedRepliesLoading,setReceivedRepliesLoading]=useState(false);
   const [activities,setActivities]=useState<Activity[]>([]);
   const [activitiesLoading,setActivitiesLoading]=useState(false);
   const [activityFormOpen,setActivityFormOpen]=useState(false);
@@ -1068,7 +1080,46 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [gmailStatusLoading,setGmailStatusLoading]=useState(false);
 
   useEffect(()=>setD(clinic),[clinic]);
-  useEffect(()=>{ loadActivities(); loadNotes(); loadContacts(); loadClinicFollowUps(); resetContactForm(); resetFollowUpForm(); void refreshGmailStatus(); },[clinic.id]);
+  useEffect(()=>{ loadActivities(); loadNotes(); loadContacts(); loadClinicFollowUps(); loadReceivedReplies(); resetContactForm(); resetFollowUpForm(); void refreshGmailStatus(); },[clinic.id]);
+
+  async function loadReceivedReplies(){
+    setReceivedRepliesLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("email_messages")
+        .select("id, owner_id, clinic_id, sender, subject, body_text, received_at")
+        .eq("owner_id", OWNER_ID)
+        .eq("clinic_id", clinic.id)
+        .eq("direction", "inbound")
+        .eq("processing_status", "processed")
+        .order("received_at", { ascending:false });
+
+      if(error){
+        console.error("Unable to load received replies:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        setReceivedReplies([]);
+      } else {
+        const rows = (data as any[] | null) || [];
+        setReceivedReplies(rows.map((row)=>(
+          {
+            id:String(row.id),
+            owner_id:String(row.owner_id),
+            clinic_id:String(row.clinic_id),
+            sender:String(row.sender || ""),
+            subject:String(row.subject || ""),
+            body_text:String(row.body_text || ""),
+            received_at:String(row.received_at || ""),
+          }
+        )));
+      }
+    } finally {
+      setReceivedRepliesLoading(false);
+    }
+  }
 
   async function refreshGmailStatus(){
     setGmailStatusLoading(true);
@@ -1833,6 +1884,15 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       <div style={{display:"flex",gap:"0.75rem",marginTop:"1rem"}}>
         <button className="primary saveBtn" onClick={saveChanges}>Save Changes</button>
         <button onClick={onClose}>Cancel</button>
+      </div>
+    </div>
+
+    <div className="drawerSection">
+      <h3>Received Replies</h3>
+      <div className="timeline">
+        {receivedRepliesLoading ? <p className="muted">Loading replies…</p>
+          : receivedReplies.length===0 ? <p className="muted">No replies yet</p>
+          : receivedReplies.map((reply)=><div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p>{reply.body_text||"—"}</p></div></div>)}
       </div>
     </div>
 
