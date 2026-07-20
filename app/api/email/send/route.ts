@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle(),
       supabaseAdmin
         .from("email_templates")
-        .select("id, owner_id, name, subject, body")
+        .select("id, owner_id, name, subject, body, category")
         .eq("id", templateId)
         .eq("owner_id", CRM_OWNER_ID)
         .maybeSingle(),
@@ -85,6 +85,8 @@ export async function POST(request: NextRequest) {
   if (templateError || !template) {
     return NextResponse.json({ error: "Template not found for owner" }, { status: 404 });
   }
+
+  const isFollowUp = String(template.category || "").toLowerCase().startsWith("follow-up");
 
   let contact:
     | { id: string; email: string | null; first_name: string | null; last_name: string | null }
@@ -208,6 +210,15 @@ export async function POST(request: NextRequest) {
     due.setDate(due.getDate() + 7);
     due.setHours(12, 0, 0, 0);
 
+    if (isFollowUp) {
+      await supabaseAdmin
+        .from("follow_ups")
+        .update({ status: "completed" })
+        .eq("owner_id", CRM_OWNER_ID)
+        .eq("clinic_id", clinicId)
+        .in("status", ["pending", "overdue"]);
+    }
+
     await supabaseAdmin.from("email_messages").insert({
       owner_id: CRM_OWNER_ID,
       clinic_id: clinicId,
@@ -239,7 +250,7 @@ export async function POST(request: NextRequest) {
       owner_id: CRM_OWNER_ID,
       clinic_id: clinicId,
       activity_type: "email_sent",
-      description: "First email sent",
+      description: isFollowUp ? "Follow-up email sent" : "First email sent",
       occurred_at: nowIso,
     });
 
@@ -248,8 +259,8 @@ export async function POST(request: NextRequest) {
       clinic_id: clinicId,
       due_at: due.toISOString(),
       status: "pending",
-      title: "Follow up after first email",
-      description: "Follow up after first email",
+      title: isFollowUp ? "Review reply after follow-up email" : "Follow up after first email",
+      description: isFollowUp ? "Review reply after follow-up email" : "Follow up after first email",
       created_at: nowIso,
     });
 
