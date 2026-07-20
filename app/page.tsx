@@ -15,37 +15,9 @@ type Clinic = {
 import { formatStatusLabel, formatPriorityLabel, priorityPillClass, normalizeStatusValue, normalizePriorityValue, STATUS_OPTIONS, PRIORITY_OPTIONS } from "../lib/clinic-utils";
 
 const iso=(d=new Date())=>d.toISOString().slice(0,10);
-const plusDays=(date:string,days:number)=>{const d=new Date(`${date}T12:00:00`);d.setDate(d.getDate()+days);return iso(d);};
 
 function addHistory(c:Clinic, action:string, note=""):Clinic {
   return {...c, history:[{date:iso(),action,note},...(c.history||[])]};
-}
-
-function emailBody(c:Clinic,follow=false){
-  return follow
-  ? `Dear ${c.name} Team,
-
-I wanted to follow up on my previous email regarding DressingRoll, our UK-supplied cut-to-size hydrocolloid dressing roll for professional foot care.
-
-If this may be relevant to your clinic, I would be pleased to arrange a complimentary evaluation sample.
-
-Kind regards,
-Dmitrij Feodorov
-DressingRoll
-https://dressingroll.co.uk`
-  : `Dear ${c.name} Team,
-
-I found your clinic while researching podiatry practices across the UK and thought DressingRoll could be a useful addition to your clinical supplies.
-
-DressingRoll is a UK-supplied hydrocolloid dressing roll developed for professional use. It can be cut to the exact size required, helping reduce waste while providing flexible protection for suitable superficial skin applications.
-
-You can view the product and specifications at https://dressingroll.co.uk.
-
-If you would like to evaluate it in your clinic, simply reply to this email and I will arrange a complimentary sample.
-
-Kind regards,
-Dmitrij Feodorov
-DressingRoll`;
 }
 
 
@@ -805,34 +777,16 @@ export default function Home(){
     }
   }
 
-  function markSent(c: Clinic) {
-    const follow = c.status === "follow_up_due";
+  function getTodayQueueEmailPreview(clinic: Clinic) {
+    const isFollowUp = normalizeStatusValue(clinic.status) === "follow_up_due";
+    const requiredCategory = isFollowUp ? "Follow-up 1" : "First Contact";
+    const template = emailTemplates.find((item) => item.category === requiredCategory);
 
-    updateClinic(
-      c.id,
-      (x) =>
-        addHistory(
-          follow
-            ? {
-                ...x,
-                status: "email_sent",
-                followUpDate: plusDays(iso(), 7),
-                nextAction: "Wait for reply",
-                nextActionDate: plusDays(iso(), 7),
-              }
-            : {
-                ...x,
-                status: "email_sent",
-                firstEmailDate: iso(),
-                followUpDate: plusDays(iso(), 7),
-                nextAction: "Send follow-up",
-                nextActionDate: plusDays(iso(), 7),
-              },
-          follow ? "Follow-up email sent" : "First email sent"
-        )
-    );
+    if (!template) {
+      return `Missing email template for category: ${requiredCategory}`;
+    }
 
-    setQueueIndex((i) => i + 1);
+    return applyTemplateVariables(template.body, clinic, "there");
   }
 
   async function runWorkflowAction(clinic:Clinic, action:WorkflowActionKey){
@@ -976,7 +930,7 @@ export default function Home(){
           :<div className="leadCard">
             <div className="leadTop"><div><span className="counter">{queueIndex+1} / {queue.length}</span><h2>{current.name}</h2><p>{current.services||"Podiatry clinic"}</p></div><span className="priority">Priority {current.priority}</span></div>
             <div className="details"><Detail label="Email" value={current.email||"Missing"}/><Detail label="City" value={current.city}/><Detail label="Status" value={formatStatusLabel(current.status)}/><Detail label="Next action" value={current.nextAction}/></div>
-            <pre className="emailBox">{emailBody(current,current.status==="follow_up_due")}</pre>
+            <pre className="emailBox">{getTodayQueueEmailPreview(current)}</pre>
             <div className="leadActions">
               {current.website&&<a href={current.website} target="_blank">Open Website</a>}
               {current.email&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
