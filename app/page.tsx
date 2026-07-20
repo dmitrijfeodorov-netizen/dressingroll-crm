@@ -1888,15 +1888,6 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
     </div>
 
     <div className="drawerSection">
-      <h3>Received Replies</h3>
-      <div className="timeline">
-        {receivedRepliesLoading ? <p className="muted">Loading replies…</p>
-          : receivedReplies.length===0 ? <p className="muted">No replies yet</p>
-          : receivedReplies.map((reply)=><div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p>{reply.body_text||"—"}</p></div></div>)}
-      </div>
-    </div>
-
-    <div className="drawerSection">
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"1rem"}}>
         <h3>History</h3>
         <button className="primary" onClick={()=>setActivityFormOpen(true)} style={{padding:"9px 14px",background:"#3d756a",borderColor:"#3d756a",color:"#fff"}}>
@@ -1927,6 +1918,15 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
         {activitiesLoading ? <p className="muted">Loading activities…</p>
           : activities.length===0 ? <p className="muted">No activity recorded yet.</p>
           : activities.map((activity)=><div className="timelineItem" key={activity.id}><i/><div><b>{activity.activity_type.replace(/_/g," ")}</b><span>{new Date(activity.created_at).toLocaleString()}</span><p>{activity.description}</p></div></div>)}
+      </div>
+    </div>
+
+    <div className="drawerSection">
+      <h3>Received Replies</h3>
+      <div className="timeline">
+        {receivedRepliesLoading ? <p className="muted">Loading replies…</p>
+          : receivedReplies.length===0 ? <p className="muted">No replies yet</p>
+          : receivedReplies.map((reply)=><div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p>{reply.body_text||"—"}</p></div></div>)}
       </div>
     </div>
   </aside></div>
