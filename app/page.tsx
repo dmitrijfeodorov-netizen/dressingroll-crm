@@ -386,6 +386,8 @@ export default function Home(){
   const [query,setQuery]=useState("");
   const [statusFilter,setStatusFilter]=useState("");
   const [priorityFilter,setPriorityFilter]=useState("");
+  const [gmailSyncing,setGmailSyncing]=useState(false);
+  const [gmailSyncMessage,setGmailSyncMessage]=useState("");
   const [queue,setQueue]=useState<string[]>([]);
   const [queueIndex,setQueueIndex]=useState(0);
   const [selectedId,setSelectedId]=useState<string|null>(null);
@@ -869,6 +871,32 @@ export default function Home(){
     const b=new Blob([csv],{type:"text/csv"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="DressingRoll_CRM_Export.csv";a.click();
   }
 
+  async function syncGmailReplies(){
+    if(gmailSyncing) return;
+    setGmailSyncing(true);
+    setGmailSyncMessage("");
+
+    try {
+      const response = await fetch("/api/gmail/sync", {
+        method:"POST",
+        credentials:"include",
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setGmailSyncMessage(String(payload?.error || "Gmail sync failed"));
+        return;
+      }
+
+      setGmailSyncMessage(`Synced: ${Number(payload?.inserted || 0)} inserted, ${Number(payload?.matched || 0)} matched.`);
+      await refreshAllData(false);
+    } catch (error) {
+      setGmailSyncMessage(error instanceof Error ? error.message : "Gmail sync failed");
+    } finally {
+      setGmailSyncing(false);
+    }
+  }
+
   const nav=[
     ["dashboard","Dashboard","◫"],["today","Today's Queue","▶"],["clinics","All Clinics","●"],
     ["followups","Follow-ups","↻"],["samples","Samples","□"],["customers","Customers","£"],["email_templates","Email Templates","✉"],
@@ -887,8 +915,13 @@ export default function Home(){
       <header className="topbar">
         <button className="menuBtn" onClick={()=>setSidebarOpen(!sidebarOpen)}>☰</button>
         <div><h1>{nav.find(n=>n[0]===section)?.[1]}</h1><p>UK podiatry clinic sales control</p></div>
-        <div className="topActions"><button onClick={exportCsv}>Export CSV</button><div className="avatar">DF</div></div>
+        <div className="topActions">
+          <button onClick={syncGmailReplies} disabled={gmailSyncing}>{gmailSyncing?"Syncing...":"Sync Gmail Replies"}</button>
+          <button onClick={exportCsv}>Export CSV</button>
+          <div className="avatar">DF</div>
+        </div>
       </header>
+      {gmailSyncMessage&&<div className="notice" style={{margin:"0 0 1rem 0"}}>{gmailSyncMessage}</div>}
 
       <main className="content">
         {section==="dashboard"&&<>
