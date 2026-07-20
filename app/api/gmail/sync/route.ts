@@ -94,6 +94,50 @@ function maxHistoryId(current: string | null, next: string | null | undefined) {
   }
 }
 
+function normalizeSearchText(input: string) {
+  return input.toLowerCase().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function hasStrongAutoAckBodyPhrase(bodyText: string) {
+  const normalized = normalizeSearchText(bodyText);
+  if (!normalized) return false;
+
+  const strongPhrases = [
+    "unable to take new clients",
+    "make or change an existing appointment",
+    "book a new appointment",
+    "reschedule an appointment",
+    "we will get back to you as soon as possible",
+  ];
+
+  return strongPhrases.some((phrase) => normalized.includes(phrase));
+}
+
+function looksAutomaticReply(headers: HeaderMap, subject: string, bodyText: string) {
+  const autoSubmitted = String(headers["auto-submitted"] || "").toLowerCase();
+  if (autoSubmitted && autoSubmitted !== "no") return true;
+
+  const precedence = String(headers["precedence"] || "").toLowerCase();
+  if (["bulk", "list", "junk", "auto_reply", "auto-reply"].includes(precedence)) return true;
+
+  if (headers["x-autoreply"] || headers["x-autorespond"] || headers["x-auto-response-suppress"]) return true;
+
+  const normalizedSubject = subject.toLowerCase();
+  if (
+    /\b(out of office|automatic reply|auto reply|autoreply|autoresponder|vacation|delivery status notification|undeliverable|mail delivery subsystem|thank you for contacting)\b/.test(
+      normalizedSubject
+    )
+  ) {
+    return true;
+  }
+
+  if (hasStrongAutoAckBodyPhrase(bodyText)) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function POST() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
@@ -247,6 +291,7 @@ export async function POST() {
       const recipient = headers["to"] || "";
       const subject = headers["subject"] || "(no subject)";
       const bodies = extractBodies(full.data.payload);
+      const combinedBodyText = `${bodies.textBody || ""}\n${bodies.htmlBody || ""}`;
 
       const receivedAt = full.data.internalDate
         ? new Date(Number(full.data.internalDate)).toISOString()
@@ -269,12 +314,18 @@ export async function POST() {
         continue;
       }
 
+      const automaticReply = looksAutomaticReply(headers, subject, combinedBodyText);
+      if (automaticReply) {
+        ignored += 1;
+        continue;
+      }
+
       let clinicId: string | null = null;
 
       if (gmailThreadId) {
         const { data: outboundRows, error: outboundError } = await supabaseAdmin
           .from("email_messages")
-          .select("id, clinic_id, direction, status, sent_at, created_at")
+          .select("id, clinic_id, direction, status, recipient, sent_at, created_at")
           .eq("owner_id", CRM_OWNER_ID)
           .eq("gmail_thread_id", gmailThreadId)
           .order("sent_at", { ascending: false, nullsFirst: false })
@@ -289,18 +340,23 @@ export async function POST() {
           clinic_id: string | null;
           direction?: string | null;
           status?: string | null;
+          recipient?: string | null;
         }>;
 
-        const matchedOutbound =
-          rows.find((row) => row.direction === "outbound" && Boolean(row.clinic_id)) ||
-          rows.find((row) => !row.direction && row.status === "sent" && Boolean(row.clinic_id)) ||
-          rows.find((row) => Boolean(row.clinic_id));
+        const matchedRows = rows.filter((row) => {
+          const isOutbound = row.direction === "outbound" || (!row.direction && row.status === "sent");
+          if (!isOutbound || !row.clinic_id) return false;
+          return normalizeEmailAddress(String(row.recipient || "")) === sender;
+        });
 
-        clinicId = matchedOutbound?.clinic_id || null;
+        const matchedClinicIds = [...new Set(matchedRows.map((row) => String(row.clinic_id || "")).filter(Boolean))];
+        if (matchedClinicIds.length === 1) {
+          clinicId = matchedClinicIds[0];
+        }
       }
 
       if (!clinicId) {
-        // Ignore unrelated inbox mail not tied to an outbound CRM thread.
+        // Ignore unrelated or unconfident matches without CRM side effects.
         ignored += 1;
         continue;
       }
