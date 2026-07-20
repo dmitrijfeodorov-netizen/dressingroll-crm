@@ -1,4 +1,5 @@
 import type { Clinic } from "../lib/clinic-types";
+import { formatPriorityLabel, formatStatusLabel, PRIORITY_OPTIONS, STATUS_OPTIONS, priorityPillClass } from "../lib/clinic-utils";
 
 type ClinicTableProps = {
   clinics: Clinic[];
@@ -31,26 +32,19 @@ export default function ClinicTable({
         />
         <select value={statusFilter} onChange={(e) => onStatusFilterChange(e.target.value)}>
           <option value="">All statuses</option>
-          <option value="Needs Email">Needs Email</option>
-          <option value="Ready to Email">Ready to Email</option>
-          <option value="Email Sent">Email Sent</option>
-          <option value="Follow-up Due">Follow-up Due</option>
-          <option value="Replied">Replied</option>
-          <option value="Interested">Interested</option>
-          <option value="Sample Requested">Sample Requested</option>
-          <option value="Sample Sent">Sample Sent</option>
-          <option value="Quote Sent">Quote Sent</option>
-          <option value="First Order">First Order</option>
-          <option value="Repeat Customer">Repeat Customer</option>
-          <option value="Not Interested">Not Interested</option>
-          <option value="Invalid Email">Invalid Email</option>
-          <option value="Do Not Contact">Do Not Contact</option>
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
         <select value={priorityFilter} onChange={(e) => onPriorityFilterChange(e.target.value)}>
           <option value="">All priorities</option>
-          <option>A</option>
-          <option>B</option>
-          <option>C</option>
+          {PRIORITY_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
         </select>
       </div>
 
@@ -80,9 +74,9 @@ export default function ClinicTable({
                 <td>{c.email || "—"}</td>
                 <td>{c.city}</td>
                 <td>
-                  <span className={`pill p${c.priority}`}>{c.priority}</span>
+                  <span className={`pill ${priorityPillClass(c.priority)}`}>{formatPriorityLabel(c.priority)}</span>
                 </td>
-                <td>{c.status}</td>
+                <td>{formatStatusLabel(c.status)}</td>
                 <td>{c.nextAction}</td>
                 <td>{c.nextActionDate}</td>
                 <td>

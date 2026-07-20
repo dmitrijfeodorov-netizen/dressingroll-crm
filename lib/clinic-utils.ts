@@ -1,20 +1,27 @@
 import type { Clinic, ClinicRow } from "./clinic-types";
 
-export const statuses = [
-  "Needs Email",
-  "Ready to Email",
-  "Email Sent",
-  "Follow-up Due",
-  "Replied",
-  "Interested",
-  "Sample Requested",
-  "Sample Sent",
-  "Quote Sent",
-  "First Order",
-  "Repeat Customer",
-  "Not Interested",
-  "Invalid Email",
-  "Do Not Contact",
+export const STATUS_OPTIONS = [
+  { value: "research", label: "Research" },
+  { value: "ready_to_email", label: "Ready to Email" },
+  { value: "email_sent", label: "Email Sent" },
+  { value: "follow_up_due", label: "Follow-up Due" },
+  { value: "replied", label: "Replied" },
+  { value: "interested", label: "Interested" },
+  { value: "sample_requested", label: "Sample Requested" },
+  { value: "sample_sent", label: "Sample Sent" },
+  { value: "quote_sent", label: "Quote Sent" },
+  { value: "negotiation", label: "Negotiation" },
+  { value: "first_order", label: "First Order" },
+  { value: "repeat_customer", label: "Repeat Customer" },
+  { value: "not_interested", label: "Not Interested" },
+  { value: "invalid_contact", label: "Invalid Contact" },
+  { value: "archived", label: "Archived" },
+];
+
+export const PRIORITY_OPTIONS = [
+  { value: "high", label: "High" },
+  { value: "normal", label: "Normal" },
+  { value: "low", label: "Low" },
 ];
 
 export const OWNER_ID = "4fe3eb83-7c50-4eee-8af7-4a550dacecd9";
@@ -35,6 +42,80 @@ export const plusDays = (date: string, days: number) => {
   d.setDate(d.getDate() + days);
   return iso(d);
 };
+
+export function normalizeStatusValue(value: string | undefined | null, hasEmail = false) {
+  const raw = (value || "").trim().toLowerCase();
+  if (!raw) return hasEmail ? "ready_to_email" : "research";
+
+  const normalized = raw.replace(/\s+/g, "_").replace(/-/g, "_");
+  const directMap: Record<string, string> = {
+    research: "research",
+    ready_to_email: "ready_to_email",
+    email_sent: "email_sent",
+    follow_up_due: "follow_up_due",
+    replied: "replied",
+    interested: "interested",
+    sample_requested: "sample_requested",
+    sample_sent: "sample_sent",
+    quote_sent: "quote_sent",
+    negotiation: "negotiation",
+    first_order: "first_order",
+    repeat_customer: "repeat_customer",
+    not_interested: "not_interested",
+    invalid_contact: "invalid_contact",
+    archived: "archived",
+    needs_email: "research",
+    invalid_email: "invalid_contact",
+    do_not_contact: "archived",
+  };
+
+  return directMap[normalized] || normalized || (hasEmail ? "ready_to_email" : "research");
+}
+
+export function formatStatusLabel(value: string | undefined | null) {
+  const normalized = normalizeStatusValue(value, false);
+  const labelMap: Record<string, string> = {
+    research: "Research",
+    ready_to_email: "Ready to Email",
+    email_sent: "Email Sent",
+    follow_up_due: "Follow-up Due",
+    replied: "Replied",
+    interested: "Interested",
+    sample_requested: "Sample Requested",
+    sample_sent: "Sample Sent",
+    quote_sent: "Quote Sent",
+    negotiation: "Negotiation",
+    first_order: "First Order",
+    repeat_customer: "Repeat Customer",
+    not_interested: "Not Interested",
+    invalid_contact: "Invalid Contact",
+    archived: "Archived",
+  };
+  return labelMap[normalized] || "Research";
+}
+
+export function normalizePriorityValue(value: string | undefined | null) {
+  const raw = (value || "").trim().toLowerCase();
+  if (raw === "high" || raw === "normal" || raw === "low") return raw;
+  if (raw === "a") return "high";
+  if (raw === "b") return "normal";
+  if (raw === "c") return "low";
+  return "normal";
+}
+
+export function formatPriorityLabel(value: string | undefined | null) {
+  const normalized = normalizePriorityValue(value);
+  if (normalized === "high") return "High";
+  if (normalized === "low") return "Low";
+  return "Normal";
+}
+
+export function priorityPillClass(value: string | undefined | null) {
+  const normalized = normalizePriorityValue(value);
+  if (normalized === "high") return "pA";
+  if (normalized === "low") return "pC";
+  return "pB";
+}
 
 export function addHistory(c: Clinic, action: string, note = ""): Clinic {
   return {
@@ -73,15 +154,11 @@ DressingRoll`;
 export function rowToClinic(row: ClinicRow): Clinic {
   const hasEmail = Boolean(row.email);
   const nextDate = row.next_follow_up_at?.slice(0, 10) || "";
-  let status = row.status || (hasEmail ? "Ready to Email" : "Needs Email");
+  let status = normalizeStatusValue(row.status, hasEmail);
 
-  if (status === "research") status = hasEmail ? "Ready to Email" : "Needs Email";
-  if (status === "Email Sent" && nextDate && nextDate <= iso()) status = "Follow-up Due";
+  if (status === "email_sent" && nextDate && nextDate <= iso()) status = "follow_up_due";
 
-  let priority = row.priority || "B";
-  if (priority === "normal") priority = hasEmail ? "A" : "C";
-  if (priority === "high") priority = "A";
-  if (priority === "low") priority = "C";
+  const priority = normalizePriorityValue(row.priority);
 
   return {
     id: row.id,
@@ -102,7 +179,7 @@ export function rowToClinic(row: ClinicRow): Clinic {
     lastReplyDate: "",
     sampleStatus: "Not sent",
     customer: "No",
-    nextAction: status === "Needs Email" ? "Find email" : status === "Ready to Email" ? "Send first email" : "",
+    nextAction: status === "research" ? "Find email" : status === "ready_to_email" ? "Send first email" : "",
     nextActionDate: nextDate,
     notes: "",
     history: [],
@@ -120,7 +197,7 @@ export function clinicToRow(c: Clinic) {
     postcode: c.postcode || null,
     source_reference: c.source || null,
     status: c.status,
-    priority: c.priority,
+    priority: normalizePriorityValue(c.priority),
     last_contacted_at: c.firstEmailDate ? `${c.firstEmailDate}T12:00:00Z` : null,
     next_follow_up_at: c.followUpDate ? `${c.followUpDate}T12:00:00Z` : null,
     updated_at: new Date().toISOString(),
@@ -130,18 +207,18 @@ export function clinicToRow(c: Clinic) {
 export function getClinicMetrics(clinics: Clinic[]) {
   return {
     total: clinics.length,
-    ready: clinics.filter((c) => c.status === "Ready to Email").length,
-    sent: clinics.filter((c) => c.status === "Email Sent").length,
-    follow: clinics.filter((c) => c.status === "Follow-up Due").length,
-    replies: clinics.filter((c) => ["Replied", "Interested"].includes(c.status)).length,
-    samples: clinics.filter((c) => ["Sample Requested", "Sample Sent"].includes(c.status)).length,
-    customers: clinics.filter((c) => ["First Order", "Repeat Customer"].includes(c.customer)).length,
+    ready: clinics.filter((c) => c.status === "ready_to_email").length,
+    sent: clinics.filter((c) => c.status === "email_sent").length,
+    follow: clinics.filter((c) => c.status === "follow_up_due").length,
+    replies: clinics.filter((c) => ["replied", "interested"].includes(c.status)).length,
+    samples: clinics.filter((c) => ["sample_requested", "sample_sent"].includes(c.status)).length,
+    customers: clinics.filter((c) => ["first_order", "repeat_customer"].includes(c.status)).length,
   };
 }
 
 export function getSectionRows(section: string, clinics: Clinic[], filtered: Clinic[]) {
-  if (section === "followups") return clinics.filter((c) => c.status === "Follow-up Due");
-  if (section === "samples") return clinics.filter((c) => ["Sample Requested", "Sample Sent"].includes(c.status));
-  if (section === "customers") return clinics.filter((c) => ["First Order", "Repeat Customer"].includes(c.customer));
+  if (section === "followups") return clinics.filter((c) => c.status === "follow_up_due");
+  if (section === "samples") return clinics.filter((c) => ["sample_requested", "sample_sent"].includes(c.status));
+  if (section === "customers") return clinics.filter((c) => ["first_order", "repeat_customer"].includes(c.status));
   return filtered;
 }

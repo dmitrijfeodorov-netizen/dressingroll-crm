@@ -1,5 +1,5 @@
 import type { Clinic } from "../lib/clinic-types";
-import { emailBody } from "../lib/clinic-utils";
+import { emailBody, formatStatusLabel } from "../lib/clinic-utils";
 
 type TodayQueueProps = {
   queue: string[];
@@ -71,10 +71,10 @@ export default function TodayQueue({
           <div className="details">
             <Detail label="Email" value={current.email || "Missing"} />
             <Detail label="City" value={current.city} />
-            <Detail label="Status" value={current.status} />
+            <Detail label="Status" value={formatStatusLabel(current.status)} />
             <Detail label="Next action" value={current.nextAction} />
           </div>
-          <pre className="emailBox">{emailBody(current, current.status === "Follow-up Due")}</pre>
+          <pre className="emailBox">{emailBody(current, current.status === "follow_up_due")}</pre>
           <div className="leadActions">
             {current.website && (
               <a href={current.website} target="_blank" rel="noreferrer">

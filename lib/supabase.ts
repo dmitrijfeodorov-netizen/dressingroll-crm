@@ -8,7 +8,7 @@ export const supabase = createClient(supabaseUrl, supabaseKey);
 export async function fetchAllOwnerClinics(ownerId: string) {
   const BATCH_SIZE = 1000;
   const selectColumns =
-    "id,clinic_name,email,phone,website,city,county,postcode,source_reference,status,priority,last_contacted_at,next_follow_up_at";
+    "id,clinic_name,clinic_type,email,phone,website,address_line_1,address_line_2,city,county,postcode,country,source,source_reference,status,priority,last_contacted_at,next_follow_up_at";
   const rows: Array<Record<string, unknown>> = [];
   let from = 0;
 
