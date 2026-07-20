@@ -106,6 +106,7 @@ create unique index if not exists uq_email_messages_owner_gmail_message_id
 
 -- Security posture: keep sync cursor table inaccessible to browser roles.
 alter table public.gmail_sync_cursors enable row level security;
+grant all privileges on table public.gmail_sync_cursors to service_role;
 revoke all on table public.gmail_sync_cursors from anon, authenticated;
 
 drop policy if exists gmail_sync_cursors_no_browser_access on public.gmail_sync_cursors;
