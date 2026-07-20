@@ -138,11 +138,8 @@ function looksAutomaticReply(headers: HeaderMap, subject: string, bodyText: stri
   return false;
 }
 
-export async function POST() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-  }
+async function runGmailSync(sessionEmail?: string) {
+  const normalizedSessionEmail = sessionEmail ? normalizeEmailAddress(sessionEmail) : "";
 
   const supabaseAdmin = getSupabaseAdmin();
   const startedAtIso = new Date().toISOString();
@@ -177,8 +174,7 @@ export async function POST() {
     }
 
     const connectedEmail = normalizeEmailAddress(String(gmailConn.google_email || ""));
-    const sessionEmail = normalizeEmailAddress(String(session.user.email || ""));
-    if (connectedEmail && sessionEmail && connectedEmail !== sessionEmail) {
+    if (connectedEmail && normalizedSessionEmail && connectedEmail !== normalizedSessionEmail) {
       return NextResponse.json({ error: "Authenticated user does not match connected Gmail owner." }, { status: 403 });
     }
 
@@ -485,4 +481,29 @@ export async function POST() {
 
     return NextResponse.json({ error: message }, { status: 502 });
   }
+}
+
+export async function POST() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  return runGmailSync(String(session.user.email));
+}
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization") || "";
+  const expectedSecret = process.env.CRON_SECRET || "";
+
+  if (!expectedSecret) {
+    return NextResponse.json({ error: "CRON_SECRET is not configured" }, { status: 500 });
+  }
+
+  const expectedHeader = `Bearer ${expectedSecret}`;
+  if (authHeader !== expectedHeader) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  return runGmailSync();
 }
