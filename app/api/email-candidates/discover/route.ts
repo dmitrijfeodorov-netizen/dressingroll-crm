@@ -601,7 +601,8 @@ export async function POST(request: NextRequest) {
             const pageFetchQueue: string[] = [];
 
             for (const result of organicResults) {
-              const sourceUrl = String(result.link || "").trim();
+              const rawLink = String(result.link || "").trim();
+              const sourceUrl = /^https?:\/\//i.test(rawLink) ? rawLink : rawLink ? `https://${rawLink}` : "";
               if (!isPublicHttpUrl(sourceUrl)) continue;
 
               const snippetText = `${String(result.title || "")} ${String(result.snippet || "")}`;
