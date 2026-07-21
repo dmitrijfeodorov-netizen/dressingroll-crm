@@ -549,9 +549,8 @@ export async function POST(request: NextRequest) {
     if (!serperApiKey) {
       externalSearch.reason = "SERPER_API_KEY is not configured";
     } else {
-      const clinicName = String(clinic.clinic_name || "").trim() || "clinic";
       const clinicDomain = normalizeDomain(baseHost);
-      const query = `"${clinicName}" "${clinicDomain}" email`;
+      const query = `"${clinicDomain}" email`;
 
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4_500);
