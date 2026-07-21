@@ -71,6 +71,18 @@ type ReceivedReply = {
   received_at:string;
 };
 
+type EmailCandidate = {
+  id:string;
+  owner_id:string;
+  clinic_id:string;
+  email:string;
+  source_url:string;
+  confidence:string;
+  status:string;
+  created_at:string;
+  reviewed_at:string;
+};
+
 type Contact = {
   id:string;
   clinic_id:string;
@@ -1069,6 +1081,11 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [noteSaving,setNoteSaving]=useState(false);
   const [receivedReplies,setReceivedReplies]=useState<ReceivedReply[]>([]);
   const [receivedRepliesLoading,setReceivedRepliesLoading]=useState(false);
+  const [emailCandidates,setEmailCandidates]=useState<EmailCandidate[]>([]);
+  const [emailCandidatesLoading,setEmailCandidatesLoading]=useState(false);
+  const [emailCandidatesError,setEmailCandidatesError]=useState("");
+  const [approveCandidateId,setApproveCandidateId]=useState<string|null>(null);
+  const [emailCandidatesMessage,setEmailCandidatesMessage]=useState("");
   const [activities,setActivities]=useState<Activity[]>([]);
   const [activitiesLoading,setActivitiesLoading]=useState(false);
   const [activityFormOpen,setActivityFormOpen]=useState(false);
@@ -1080,7 +1097,96 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [gmailStatusLoading,setGmailStatusLoading]=useState(false);
 
   useEffect(()=>setD(clinic),[clinic]);
-  useEffect(()=>{ loadActivities(); loadNotes(); loadContacts(); loadClinicFollowUps(); loadReceivedReplies(); resetContactForm(); resetFollowUpForm(); void refreshGmailStatus(); },[clinic.id]);
+  useEffect(()=>{ loadActivities(); loadNotes(); loadContacts(); loadClinicFollowUps(); loadReceivedReplies(); loadEmailCandidates(); resetContactForm(); resetFollowUpForm(); void refreshGmailStatus(); },[clinic.id]);
+
+  async function loadEmailCandidates(){
+    setEmailCandidatesLoading(true);
+    setEmailCandidatesError("");
+    try {
+      const { data, error } = await supabase
+        .from("clinic_email_candidates")
+        .select("id, owner_id, clinic_id, email, source_url, confidence, status, created_at, reviewed_at")
+        .eq("owner_id", OWNER_ID)
+        .eq("clinic_id", clinic.id)
+        .order("created_at", { ascending:false });
+
+      if(error){
+        console.error("Unable to load email candidates:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        setEmailCandidates([]);
+        setEmailCandidatesError(`Unable to load email candidates: ${error.message}`);
+      } else {
+        const rows = (data as any[] | null) || [];
+        setEmailCandidates(rows.map((row)=>(
+          {
+            id:String(row.id),
+            owner_id:String(row.owner_id),
+            clinic_id:String(row.clinic_id),
+            email:String(row.email || ""),
+            source_url:String(row.source_url || ""),
+            confidence:String(row.confidence || ""),
+            status:String(row.status || ""),
+            created_at:String(row.created_at || ""),
+            reviewed_at:String(row.reviewed_at || ""),
+          }
+        )));
+      }
+    } finally {
+      setEmailCandidatesLoading(false);
+    }
+  }
+
+  async function approveEmailCandidate(candidate:EmailCandidate){
+    if(approveCandidateId) return;
+    if(candidate.status !== "pending") return;
+
+    const ok = window.confirm(`Approve ${candidate.email} for this clinic?`);
+    if(!ok) return;
+
+    setApproveCandidateId(candidate.id);
+    setEmailCandidatesError("");
+    setEmailCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/approve", {
+        method:"POST",
+        credentials:"include",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setEmailCandidatesError(String(payload?.error || "Unable to approve email candidate."));
+        return;
+      }
+
+      if(payload?.ok === false){
+        setEmailCandidatesMessage(String(payload?.message || "No changes were applied."));
+        await loadEmailCandidates();
+        return;
+      }
+
+      const nextClinicEmail = String(payload?.clinic?.email || "").trim();
+      if(nextClinicEmail){
+        setD((prev)=>({ ...prev, email: nextClinicEmail }));
+      }
+
+      setEmailCandidatesMessage(String(payload?.message || "Email candidate approved."));
+      await onEmailSent();
+      await loadEmailCandidates();
+    } catch (error) {
+      setEmailCandidatesError(error instanceof Error ? error.message : "Unable to approve email candidate.");
+    } finally {
+      setApproveCandidateId(null);
+    }
+  }
 
   async function loadReceivedReplies(){
     setReceivedRepliesLoading(true);
@@ -1927,6 +2033,17 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
         {receivedRepliesLoading ? <p className="muted">Loading replies…</p>
           : receivedReplies.length===0 ? <p className="muted">No replies yet</p>
           : receivedReplies.map((reply)=><div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p>{reply.body_text||"—"}</p></div></div>)}
+      </div>
+    </div>
+
+    <div className="drawerSection">
+      <h3>Email candidates</h3>
+      {emailCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{emailCandidatesError}</p>}
+      {emailCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{emailCandidatesMessage}</p>}
+      <div className="timeline">
+        {emailCandidatesLoading ? <p className="muted">Loading email candidates…</p>
+          : emailCandidates.length===0 ? <p className="muted">No email candidates yet</p>
+          : emailCandidates.map((candidate)=><div className="timelineItem" key={candidate.id}><i/><div><b>{candidate.email||"—"}</b><span>{candidate.created_at?new Date(candidate.created_at).toLocaleString():"—"}</span><p><b>Confidence:</b> {candidate.confidence||"—"}</p><p><b>Status:</b> {candidate.status||"—"}</p><p><b>Source:</b> {candidate.source_url?<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.source_url}</a>:"—"}</p>{candidate.status==="pending"&&<div style={{display:"flex",gap:"0.5rem",marginTop:"0.5rem"}}><button type="button" className="primary" onClick={()=>approveEmailCandidate(candidate)} disabled={Boolean(approveCandidateId)}>{approveCandidateId===candidate.id?"Approving…":"Approve"}</button></div>}</div></div>)}
       </div>
     </div>
   </aside></div>
