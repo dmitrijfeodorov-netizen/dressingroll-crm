@@ -1103,25 +1103,18 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
     setEmailCandidatesLoading(true);
     setEmailCandidatesError("");
     try {
-      const { data, error } = await supabase
-        .from("clinic_email_candidates")
-        .select("id, owner_id, clinic_id, email, source_url, confidence, status, created_at, reviewed_at")
-        .eq("owner_id", OWNER_ID)
-        .eq("clinic_id", clinic.id)
-        .order("created_at", { ascending:false });
+      const response = await fetch(`/api/email-candidates?clinicId=${encodeURIComponent(clinic.id)}`, {
+        method:"GET",
+        credentials:"include",
+      });
 
-      if(error){
-        console.error("Unable to load email candidates:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
         setEmailCandidates([]);
-        setEmailCandidatesError(`Unable to load email candidates: ${error.message}`);
+        setEmailCandidatesError(String(payload?.error || "Unable to load email candidates."));
       } else {
-        const rows = (data as any[] | null) || [];
-        setEmailCandidates(rows.map((row)=>(
+        const rows = Array.isArray(payload?.candidates) ? payload.candidates : [];
+        setEmailCandidates(rows.map((row:any)=>(
           {
             id:String(row.id),
             owner_id:String(row.owner_id),
