@@ -572,7 +572,12 @@ export async function POST(request: NextRequest) {
         });
 
         if (!serperResponse.ok) {
-          externalSearch.reason = `Serper request failed (${serperResponse.status})`;
+          const errorPayload = (await serperResponse.json().catch(() => null)) as { message?: unknown } | null;
+          const rawMessage = typeof errorPayload?.message === "string" ? errorPayload.message : "";
+          const safeMessage = rawMessage.replace(/\s+/g, " ").trim().slice(0, 180);
+          externalSearch.reason = safeMessage
+            ? `Serper request failed (${serperResponse.status}): ${safeMessage}`
+            : `Serper request failed (${serperResponse.status})`;
         } else {
           const parsedPayload = await serperResponse.json().catch(() => null);
           const isObjectPayload = Boolean(parsedPayload && typeof parsedPayload === "object" && !Array.isArray(parsedPayload));
