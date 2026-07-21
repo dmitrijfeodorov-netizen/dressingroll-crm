@@ -1086,6 +1086,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [emailCandidatesError,setEmailCandidatesError]=useState("");
   const [approveCandidateId,setApproveCandidateId]=useState<string|null>(null);
   const [rejectCandidateId,setRejectCandidateId]=useState<string|null>(null);
+  const [discoverSearching,setDiscoverSearching]=useState(false);
   const [emailCandidatesMessage,setEmailCandidatesMessage]=useState("");
   const [activities,setActivities]=useState<Activity[]>([]);
   const [activitiesLoading,setActivitiesLoading]=useState(false);
@@ -1215,6 +1216,46 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       setEmailCandidatesError(error instanceof Error ? error.message : "Unable to reject email candidate.");
     } finally {
       setRejectCandidateId(null);
+    }
+  }
+
+  async function findEmailCandidates(){
+    if(discoverSearching) return;
+    if(String(d.email || "").trim()) return;
+
+    setDiscoverSearching(true);
+    setEmailCandidatesError("");
+    setEmailCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/discover", {
+        method:"POST",
+        credentials:"include",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({ clinic_id: d.id }),
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setEmailCandidatesError(String(payload?.error || "Unable to search for email candidates."));
+        return;
+      }
+
+      const found = Number(payload?.found || 0);
+      if(found > 0){
+        setEmailCandidatesMessage(found === 1 ? "1 email candidate found." : `${found} email candidates found.`);
+      } else {
+        const externalReason = String(payload?.externalSearch?.reason || "").trim();
+        setEmailCandidatesMessage(externalReason ? `No email found (${externalReason}).` : "No email found.");
+      }
+
+      await loadEmailCandidates();
+    } catch (error) {
+      setEmailCandidatesError(error instanceof Error ? error.message : "Unable to search for email candidates.");
+    } finally {
+      setDiscoverSearching(false);
     }
   }
 
@@ -2067,7 +2108,10 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
     </div>
 
     <div className="drawerSection">
-      <h3>Email candidates</h3>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:"1rem"}}>
+        <h3>Email candidates</h3>
+        {!String(d.email || "").trim()&&<button type="button" className="primary" onClick={findEmailCandidates} disabled={discoverSearching} style={{padding:"9px 14px",background:"#3d756a",borderColor:"#3d756a",color:"#fff"}}>{discoverSearching?"Searching...":"Find email"}</button>}
+      </div>
       {emailCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{emailCandidatesError}</p>}
       {emailCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{emailCandidatesMessage}</p>}
       <div className="timeline">
