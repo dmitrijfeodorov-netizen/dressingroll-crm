@@ -83,6 +83,11 @@ type EmailCandidate = {
   reviewed_at:string;
 };
 
+type PendingEmailCandidate = EmailCandidate & {
+  clinic_name:string;
+  website:string;
+};
+
 type Contact = {
   id:string;
   clinic_id:string;
@@ -414,6 +419,11 @@ export default function Home(){
   const [queueIndex,setQueueIndex]=useState(0);
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [sidebarOpen,setSidebarOpen]=useState(false);
+  const [pendingCandidates,setPendingCandidates]=useState<PendingEmailCandidate[]>([]);
+  const [pendingCandidatesLoading,setPendingCandidatesLoading]=useState(false);
+  const [pendingCandidatesError,setPendingCandidatesError]=useState("");
+  const [pendingCandidatesMessage,setPendingCandidatesMessage]=useState("");
+  const [pendingActionId,setPendingActionId]=useState<string|null>(null);
 
   async function refreshAllData(withLoading=false){
     if(withLoading) setLoaded(false);
@@ -422,7 +432,7 @@ export default function Home(){
       const rows=(await fetchAllOwnerClinics(OWNER_ID)) as ClinicRow[];
       setDashboardRows(rows);
       setClinics(rows.map(rowToClinic));
-      await loadFollowUps();
+      await Promise.all([loadFollowUps(), loadPendingEmailCandidates()]);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("Unable to load clinics:", error);
@@ -469,6 +479,125 @@ export default function Home(){
       description:String(row.description || ""),
       created_at:String(row.created_at || ""),
     })));
+  }
+
+  async function loadPendingEmailCandidates(){
+    setPendingCandidatesLoading(true);
+    setPendingCandidatesError("");
+
+    try {
+      const response = await fetch("/api/email-candidates/pending", {
+        method:"GET",
+        credentials:"include",
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setPendingCandidates([]);
+        setPendingCandidatesError(String(payload?.error || "Unable to load pending email candidates."));
+        return;
+      }
+
+      const rows = Array.isArray(payload?.candidates) ? payload.candidates : [];
+      setPendingCandidates(rows.map((row:any)=>(
+        {
+          id:String(row.id || ""),
+          owner_id:String(row.owner_id || ""),
+          clinic_id:String(row.clinic_id || ""),
+          clinic_name:String(row.clinic_name || ""),
+          website:String(row.website || ""),
+          email:String(row.email || ""),
+          source_url:String(row.source_url || ""),
+          confidence:String(row.confidence || ""),
+          status:String(row.status || ""),
+          created_at:String(row.created_at || ""),
+          reviewed_at:String(row.reviewed_at || ""),
+        }
+      )));
+    } catch (error) {
+      setPendingCandidates([]);
+      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to load pending email candidates.");
+    } finally {
+      setPendingCandidatesLoading(false);
+    }
+  }
+
+  async function approvePendingEmailCandidate(candidate:PendingEmailCandidate){
+    if(pendingActionId) return;
+
+    const ok = window.confirm(`Approve ${candidate.email} for ${candidate.clinic_name || "this clinic"}?`);
+    if(!ok) return;
+
+    setPendingActionId(candidate.id);
+    setPendingCandidatesError("");
+    setPendingCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/approve", {
+        method:"POST",
+        credentials:"include",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setPendingCandidatesError(String(payload?.error || "Unable to approve email candidate."));
+        return;
+      }
+
+      if(payload?.ok === false){
+        setPendingCandidatesMessage(String(payload?.message || "No changes were applied."));
+        await loadPendingEmailCandidates();
+        return;
+      }
+
+      setPendingCandidates((prev)=>prev.filter((item)=>item.id!==candidate.id));
+      setPendingCandidatesMessage(String(payload?.message || "Email candidate approved."));
+      await refreshAllData(false);
+    } catch (error) {
+      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to approve email candidate.");
+    } finally {
+      setPendingActionId(null);
+    }
+  }
+
+  async function rejectPendingEmailCandidate(candidate:PendingEmailCandidate){
+    if(pendingActionId) return;
+
+    const ok = window.confirm(`Reject ${candidate.email} for ${candidate.clinic_name || "this clinic"}?`);
+    if(!ok) return;
+
+    setPendingActionId(candidate.id);
+    setPendingCandidatesError("");
+    setPendingCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/reject", {
+        method:"POST",
+        credentials:"include",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setPendingCandidatesError(String(payload?.error || "Unable to reject email candidate."));
+        return;
+      }
+
+      setPendingCandidates((prev)=>prev.filter((item)=>item.id!==candidate.id));
+      setPendingCandidatesMessage(String(payload?.message || "Email candidate rejected."));
+      await refreshAllData(false);
+    } catch (error) {
+      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to reject email candidate.");
+    } finally {
+      setPendingActionId(null);
+    }
   }
 
   async function runMigrationSql(sql:string){
@@ -959,6 +1088,7 @@ export default function Home(){
             <Metric label="Replies" value={metrics.replies} note="Active conversations"/>
             <Metric label="Samples" value={metrics.samples} note="Evaluation stage"/>
             <Metric label="Customers" value={metrics.customers} note="Paid accounts"/>
+            <Metric label="Pending email candidates" value={pendingCandidates.length} note="Need review"/>
           </section>
 
           <section className="twoCol">
@@ -975,6 +1105,15 @@ export default function Home(){
               <Funnel label="Samples" value={metrics.samples} max={metrics.total}/>
               <Funnel label="Customers" value={metrics.customers} max={metrics.total}/>
             </div>
+          </section>
+
+          <section className="panel">
+            <div className="panelHead"><h3>Pending email candidates</h3><span>{pendingCandidates.length}</span></div>
+            {pendingCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{pendingCandidatesError}</p>}
+            {pendingCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{pendingCandidatesMessage}</p>}
+            {pendingCandidatesLoading ? <p className="muted">Loading pending email candidates…</p>
+              : pendingCandidates.length===0 ? <p className="muted">No pending email candidates.</p>
+              : <div className="tablePanel" style={{marginTop:"0.75rem"}}><table><thead><tr><th>Clinic</th><th>Email</th><th>Confidence</th><th>Source</th><th>Date</th><th style={{width:"220px"}}>Actions</th></tr></thead><tbody>{pendingCandidates.map((candidate)=><tr key={candidate.id}><td><button type="button" onClick={()=>setSelectedId(candidate.clinic_id)} style={{padding:0,border:0,background:"none",color:"#1f6f61",textDecoration:"underline",cursor:"pointer",fontWeight:600}}>{candidate.clinic_name||"Unknown clinic"}</button>{candidate.website&&<small>{websiteDomain(candidate.website)}</small>}</td><td>{candidate.email||"—"}</td><td>{candidate.confidence||"—"}</td><td>{candidate.source_url?<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.source_url}</a>:"—"}</td><td>{candidate.created_at?new Date(candidate.created_at).toLocaleString():"—"}</td><td style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}><button type="button" className="primary" onClick={()=>approvePendingEmailCandidate(candidate)} disabled={Boolean(pendingActionId)}>{pendingActionId===candidate.id?"Approving…":"Approve"}</button><button type="button" onClick={()=>rejectPendingEmailCandidate(candidate)} disabled={Boolean(pendingActionId)}>{pendingActionId===candidate.id?"Rejecting…":"Reject"}</button></td></tr>)}</tbody></table></div>}
           </section>
         </>}
 
