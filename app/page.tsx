@@ -1085,6 +1085,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   const [emailCandidatesLoading,setEmailCandidatesLoading]=useState(false);
   const [emailCandidatesError,setEmailCandidatesError]=useState("");
   const [approveCandidateId,setApproveCandidateId]=useState<string|null>(null);
+  const [rejectCandidateId,setRejectCandidateId]=useState<string|null>(null);
   const [emailCandidatesMessage,setEmailCandidatesMessage]=useState("");
   const [activities,setActivities]=useState<Activity[]>([]);
   const [activitiesLoading,setActivitiesLoading]=useState(false);
@@ -1134,7 +1135,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
   }
 
   async function approveEmailCandidate(candidate:EmailCandidate){
-    if(approveCandidateId) return;
+    if(approveCandidateId || rejectCandidateId) return;
     if(candidate.status !== "pending") return;
 
     const ok = window.confirm(`Approve ${candidate.email} for this clinic?`);
@@ -1178,6 +1179,42 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       setEmailCandidatesError(error instanceof Error ? error.message : "Unable to approve email candidate.");
     } finally {
       setApproveCandidateId(null);
+    }
+  }
+
+  async function rejectEmailCandidate(candidate:EmailCandidate){
+    if(approveCandidateId || rejectCandidateId) return;
+    if(candidate.status !== "pending") return;
+
+    const ok = window.confirm(`Reject ${candidate.email} for this clinic?`);
+    if(!ok) return;
+
+    setRejectCandidateId(candidate.id);
+    setEmailCandidatesError("");
+    setEmailCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/reject", {
+        method:"POST",
+        credentials:"include",
+        headers:{
+          "Content-Type":"application/json",
+        },
+        body:JSON.stringify({ candidateId: candidate.id }),
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setEmailCandidatesError(String(payload?.error || "Unable to reject email candidate."));
+        return;
+      }
+
+      setEmailCandidatesMessage(String(payload?.message || "Email candidate rejected."));
+      await loadEmailCandidates();
+    } catch (error) {
+      setEmailCandidatesError(error instanceof Error ? error.message : "Unable to reject email candidate.");
+    } finally {
+      setRejectCandidateId(null);
     }
   }
 
@@ -2036,7 +2073,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       <div className="timeline">
         {emailCandidatesLoading ? <p className="muted">Loading email candidates…</p>
           : emailCandidates.length===0 ? <p className="muted">No email candidates yet</p>
-          : emailCandidates.map((candidate)=><div className="timelineItem" key={candidate.id}><i/><div><b>{candidate.email||"—"}</b><span>{candidate.created_at?new Date(candidate.created_at).toLocaleString():"—"}</span><p><b>Confidence:</b> {candidate.confidence||"—"}</p><p><b>Status:</b> {candidate.status||"—"}</p><p><b>Source:</b> {candidate.source_url?<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.source_url}</a>:"—"}</p>{candidate.status==="pending"&&<div style={{display:"flex",gap:"0.5rem",marginTop:"0.5rem"}}><button type="button" className="primary" onClick={()=>approveEmailCandidate(candidate)} disabled={Boolean(approveCandidateId)}>{approveCandidateId===candidate.id?"Approving…":"Approve"}</button></div>}</div></div>)}
+          : emailCandidates.map((candidate)=><div className="timelineItem" key={candidate.id}><i/><div><b>{candidate.email||"—"}</b><span>{candidate.created_at?new Date(candidate.created_at).toLocaleString():"—"}</span><p><b>Confidence:</b> {candidate.confidence||"—"}</p><p><b>Status:</b> {candidate.status||"—"}</p><p><b>Source:</b> {candidate.source_url?<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.source_url}</a>:"—"}</p>{candidate.status==="pending"&&<div style={{display:"flex",gap:"0.5rem",marginTop:"0.5rem"}}><button type="button" className="primary" onClick={()=>approveEmailCandidate(candidate)} disabled={Boolean(approveCandidateId) || Boolean(rejectCandidateId)}>{approveCandidateId===candidate.id?"Approving…":"Approve"}</button><button type="button" onClick={()=>rejectEmailCandidate(candidate)} disabled={Boolean(approveCandidateId) || Boolean(rejectCandidateId)}>{rejectCandidateId===candidate.id?"Rejecting…":"Reject"}</button></div>}</div></div>)}
       </div>
     </div>
   </aside></div>
