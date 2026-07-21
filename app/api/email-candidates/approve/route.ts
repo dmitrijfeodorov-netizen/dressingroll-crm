@@ -21,6 +21,17 @@ function isValidEmail(value: string) {
   return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(value);
 }
 
+function shouldPromoteClinicStatus(value: unknown) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+
+  if (!normalized) return true;
+  return normalized === "open" || normalized === "research" || normalized === "needs_email";
+}
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
@@ -66,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   const { data: clinic, error: clinicError } = await supabaseAdmin
     .from("clinics")
-    .select("id, owner_id, clinic_name, email")
+    .select("id, owner_id, clinic_name, email, status")
     .eq("id", candidate.clinic_id)
     .eq("owner_id", CRM_OWNER_ID)
     .maybeSingle();
@@ -84,10 +95,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: false,
       message: "Clinic email is already set. Nothing was changed.",
+      statusChanged: false,
       clinic: {
         id: clinic.id,
         clinic_name: clinic.clinic_name,
         email: clinic.email,
+        status: clinic.status,
       },
       candidate: {
         id: candidate.id,
@@ -97,13 +110,19 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  const statusChanged = shouldPromoteClinicStatus(clinic.status);
+  const clinicUpdate: { email: string; status?: string } = { email: candidateEmail };
+  if (statusChanged) {
+    clinicUpdate.status = "ready_to_email";
+  }
+
   const { data: updatedClinics, error: updateClinicError } = await supabaseAdmin
     .from("clinics")
-    .update({ email: candidateEmail })
+    .update(clinicUpdate)
     .eq("id", candidate.clinic_id)
     .eq("owner_id", CRM_OWNER_ID)
     .or("email.is.null,email.eq.")
-    .select("id, clinic_name, email");
+    .select("id, clinic_name, email, status");
 
   if (updateClinicError) {
     return NextResponse.json(
@@ -116,7 +135,7 @@ export async function POST(request: NextRequest) {
   if (!updatedClinic) {
     const { data: latestClinic, error: latestClinicError } = await supabaseAdmin
       .from("clinics")
-      .select("id, clinic_name, email")
+      .select("id, clinic_name, email, status")
       .eq("id", candidate.clinic_id)
       .eq("owner_id", CRM_OWNER_ID)
       .maybeSingle();
@@ -131,6 +150,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       ok: false,
       message: "Clinic email is already set. Nothing was changed.",
+      statusChanged: false,
       clinic: latestClinic,
       candidate: {
         id: candidate.id,
@@ -162,6 +182,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     ok: true,
     message: "Candidate approved and clinic email saved.",
+    statusChanged,
     clinic: updatedClinic,
     candidate: updatedCandidate,
   });
