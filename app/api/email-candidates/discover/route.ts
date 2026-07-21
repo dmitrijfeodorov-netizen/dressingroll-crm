@@ -52,6 +52,14 @@ function htmlEntityDecode(text: string) {
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&#(\d+);/g, (_, code) => {
+      const value = Number(code);
+      return Number.isFinite(value) ? String.fromCodePoint(value) : _;
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+      const value = parseInt(code, 16);
+      return Number.isFinite(value) ? String.fromCodePoint(value) : _;
+    })
     .replace(/&nbsp;/gi, " ");
 }
 
@@ -84,16 +92,18 @@ function isRejectedEmail(email: string) {
 }
 
 function extractEmailsFromText(text: string) {
-  const matches = text.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
+  const decodedText = htmlEntityDecode(text);
+  const matches = decodedText.match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi) || [];
   return matches.map(normalizeEmail);
 }
 
 function extractEmailsFromMailto(html: string) {
   const result: string[] = [];
+  const decodedHtml = htmlEntityDecode(html);
   const mailtoRegex = /href\s*=\s*["']mailto:([^"'#?\s>]+)/gi;
 
   let match: RegExpExecArray | null;
-  while ((match = mailtoRegex.exec(html)) !== null) {
+  while ((match = mailtoRegex.exec(decodedHtml)) !== null) {
     const value = String(match[1] || "").trim();
     if (!value) continue;
 
@@ -266,8 +276,17 @@ export async function POST(request: NextRequest) {
   const baseHost = baseWebsite.hostname;
   const rootOrigin = baseWebsite.origin;
 
-  const pages = ["/", "/contact", "/contact-us", "/about"]
-    .map((path) => new URL(path, `${rootOrigin}/`).toString());
+  const pages = Array.from(
+    new Set(
+      [
+        baseWebsite.toString(),
+        new URL("/", `${rootOrigin}/`).toString(),
+        new URL("/contact", `${rootOrigin}/`).toString(),
+        new URL("/contact-us", `${rootOrigin}/`).toString(),
+        new URL("/about", `${rootOrigin}/`).toString(),
+      ].map((url) => new URL(url).toString())
+    )
+  );
 
   const candidateMap = new Map<string, Candidate>();
   let scanned = 0;
