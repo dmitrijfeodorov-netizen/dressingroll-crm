@@ -24,8 +24,24 @@ type PageDebug = {
   text_email_count: number;
 };
 
+type ExternalSearchDebug = {
+  attempted: boolean;
+  resultsChecked: number;
+  found: number;
+  reason: string;
+};
+
+type SerperOrganicResult = {
+  title?: string;
+  snippet?: string;
+  link?: string;
+};
+
 const PAGE_TIMEOUT_MS = 8_000;
 const MAX_HTML_BYTES = 1_024 * 1_024;
+const EXTERNAL_FETCH_TIMEOUT_MS = 2_500;
+const EXTERNAL_MAX_HTML_BYTES = 512 * 1024;
+const EXTERNAL_RESULT_FETCH_LIMIT = 3;
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -50,8 +66,45 @@ function normalizeHost(host: string) {
   return host.toLowerCase().replace(/^www\./, "");
 }
 
+function normalizeDomain(domain: string) {
+  return normalizeHost(domain).trim();
+}
+
 function isSameDomain(baseHost: string, candidateHost: string) {
   return normalizeHost(baseHost) === normalizeHost(candidateHost);
+}
+
+function isValidEmail(email: string) {
+  return /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/i.test(email);
+}
+
+function emailDomain(email: string) {
+  const at = email.lastIndexOf("@");
+  if (at === -1) return "";
+  return normalizeDomain(email.slice(at + 1));
+}
+
+function isClinicDomainMatch(candidateEmail: string, clinicDomain: string) {
+  const eDomain = emailDomain(candidateEmail);
+  const cDomain = normalizeDomain(clinicDomain);
+  if (!eDomain || !cDomain) return false;
+  return eDomain === cDomain || eDomain.endsWith(`.${cDomain}`);
+}
+
+function isPublicHttpUrl(raw: string) {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+
+    const host = normalizeDomain(url.hostname);
+    if (!host) return false;
+    if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(host)) return false;
+    if (host.endsWith(".local")) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function htmlEntityDecode(text: string) {
@@ -127,6 +180,88 @@ function extractEmailsFromMailto(html: string) {
   }
 
   return result;
+}
+
+function collectSafeEmails(input: string, clinicDomain: string) {
+  return extractEmailsFromText(input).filter(
+    (email) => isValidEmail(email) && !isRejectedEmail(email) && isClinicDomainMatch(email, clinicDomain)
+  );
+}
+
+async function fetchExternalHtml(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), EXTERNAL_FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+      },
+    });
+
+    if (!response.ok) {
+      return { ok: false as const };
+    }
+
+    const resolvedUrl = String(response.url || "");
+    if (!isPublicHttpUrl(resolvedUrl)) {
+      return { ok: false as const };
+    }
+
+    const contentType = String(response.headers.get("content-type") || "").toLowerCase();
+    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
+      return { ok: false as const };
+    }
+
+    const contentLengthHeader = response.headers.get("content-length");
+    if (contentLengthHeader) {
+      const contentLength = Number(contentLengthHeader);
+      if (Number.isFinite(contentLength) && contentLength > EXTERNAL_MAX_HTML_BYTES) {
+        return { ok: false as const };
+      }
+    }
+
+    if (!response.body) {
+      return { ok: false as const };
+    }
+
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > EXTERNAL_MAX_HTML_BYTES) {
+        return { ok: false as const };
+      }
+
+      chunks.push(value);
+    }
+
+    const merged = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+
+    return {
+      ok: true as const,
+      html: new TextDecoder("utf-8").decode(merged),
+      resolvedUrl,
+    };
+  } catch {
+    return { ok: false as const };
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function fetchHtml(url: string, baseHost: string) {
@@ -300,7 +435,7 @@ export async function POST(request: NextRequest) {
 
   const { data: clinic, error: clinicError } = await supabaseAdmin
     .from("clinics")
-    .select("id, owner_id, email, website")
+    .select("id, owner_id, clinic_name, email, website")
     .eq("id", clinicId)
     .eq("owner_id", CRM_OWNER_ID)
     .maybeSingle();
@@ -350,6 +485,12 @@ export async function POST(request: NextRequest) {
 
   const candidateMap = new Map<string, Candidate>();
   const debug: PageDebug[] = [];
+  const externalSearch: ExternalSearchDebug = {
+    attempted: false,
+    resultsChecked: 0,
+    found: 0,
+    reason: "not_attempted",
+  };
   let scanned = 0;
 
   for (const pageUrl of pages) {
@@ -401,6 +542,112 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (candidateMap.size === 0) {
+    externalSearch.attempted = true;
+
+    const serperApiKey = String(process.env.SERPER_API_KEY || "").trim();
+    if (!serperApiKey) {
+      externalSearch.reason = "SERPER_API_KEY is not configured";
+    } else {
+      const clinicName = String(clinic.clinic_name || "").trim() || "clinic";
+      const clinicDomain = normalizeDomain(baseHost);
+      const query = `"${clinicName}" "${clinicDomain}" email`;
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4_500);
+
+      try {
+        const serperResponse = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": serperApiKey,
+          },
+          body: JSON.stringify({
+            q: query,
+            gl: "gb",
+            hl: "en",
+            num: 10,
+          }),
+        });
+
+        if (!serperResponse.ok) {
+          externalSearch.reason = `Serper request failed (${serperResponse.status})`;
+        } else {
+          const serperPayload = (await serperResponse.json().catch(() => ({}))) as {
+            organic?: SerperOrganicResult[];
+          };
+
+          const organicResults = Array.isArray(serperPayload.organic) ? serperPayload.organic : [];
+          externalSearch.resultsChecked = organicResults.length;
+
+          if (organicResults.length === 0) {
+            externalSearch.reason = "No organic results";
+          } else {
+            const pageFetchQueue: string[] = [];
+
+            for (const result of organicResults) {
+              const sourceUrl = String(result.link || "").trim();
+              if (!isPublicHttpUrl(sourceUrl)) continue;
+
+              const snippetText = `${String(result.title || "")} ${String(result.snippet || "")}`;
+              const snippetEmails = collectSafeEmails(snippetText, clinicDomain);
+
+              for (const email of snippetEmails) {
+                upsertCandidate(candidateMap, {
+                  email,
+                  source_url: sourceUrl,
+                  confidence: "medium",
+                });
+              }
+
+              if (snippetEmails.length === 0 && pageFetchQueue.length < EXTERNAL_RESULT_FETCH_LIMIT) {
+                pageFetchQueue.push(sourceUrl);
+              }
+            }
+
+            if (candidateMap.size === 0 && pageFetchQueue.length > 0) {
+              for (const sourceUrl of pageFetchQueue) {
+                const fetched = await fetchExternalHtml(sourceUrl);
+                if (!fetched.ok) continue;
+
+                const htmlEmails = [
+                  ...extractEmailsFromMailto(fetched.html),
+                  ...extractEmailsFromText(extractVisibleText(fetched.html)),
+                ].filter(
+                  (email) =>
+                    isValidEmail(email) &&
+                    !isRejectedEmail(email) &&
+                    isClinicDomainMatch(email, clinicDomain)
+                );
+
+                for (const email of htmlEmails) {
+                  upsertCandidate(candidateMap, {
+                    email,
+                    source_url: fetched.resolvedUrl,
+                    confidence: "medium",
+                  });
+                }
+
+                if (candidateMap.size > 0) break;
+              }
+            }
+
+            externalSearch.found = candidateMap.size;
+            externalSearch.reason = candidateMap.size > 0 ? "External candidate(s) found" : "No matching email found";
+          }
+        }
+      } catch (error: any) {
+        externalSearch.reason = error?.name === "AbortError" ? "Serper request timeout" : "Serper unavailable";
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+  } else {
+    externalSearch.reason = "Skipped: local website search found candidate(s)";
+  }
+
   const candidates = Array.from(candidateMap.values()).sort((a, b) => a.email.localeCompare(b.email));
 
   let inserted = 0;
@@ -432,5 +679,6 @@ export async function POST(request: NextRequest) {
     inserted,
     candidates,
     debug,
+    externalSearch,
   });
 }
