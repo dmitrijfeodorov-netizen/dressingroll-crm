@@ -15,6 +15,15 @@ type Candidate = {
   confidence: "high" | "medium";
 };
 
+type PageDebug = {
+  url: string;
+  status: number | null;
+  content_type: string | null;
+  html_size: number;
+  mailto_count: number;
+  text_email_count: number;
+};
+
 const PAGE_TIMEOUT_MS = 8_000;
 const MAX_HTML_BYTES = 1_024 * 1_024;
 
@@ -135,29 +144,59 @@ async function fetchHtml(url: string, baseHost: string) {
     });
 
     if (!response.ok) {
-      return { ok: false as const, reason: `HTTP ${response.status}` };
+      return {
+        ok: false as const,
+        reason: `HTTP ${response.status}`,
+        status: response.status,
+        contentType: String(response.headers.get("content-type") || "") || null,
+        htmlSize: 0,
+      };
     }
 
     const resolvedUrl = new URL(response.url);
     if (!isSameDomain(baseHost, resolvedUrl.hostname)) {
-      return { ok: false as const, reason: "External redirect blocked" };
+      return {
+        ok: false as const,
+        reason: "External redirect blocked",
+        status: response.status,
+        contentType: String(response.headers.get("content-type") || "") || null,
+        htmlSize: 0,
+      };
     }
 
     const contentType = String(response.headers.get("content-type") || "").toLowerCase();
     if (!contentType.includes("text/html") && !contentType.includes("application/xhtml+xml")) {
-      return { ok: false as const, reason: "Non-HTML response" };
+      return {
+        ok: false as const,
+        reason: "Non-HTML response",
+        status: response.status,
+        contentType: contentType || null,
+        htmlSize: 0,
+      };
     }
 
     const contentLengthHeader = response.headers.get("content-length");
     if (contentLengthHeader) {
       const contentLength = Number(contentLengthHeader);
       if (Number.isFinite(contentLength) && contentLength > MAX_HTML_BYTES) {
-        return { ok: false as const, reason: "HTML exceeds 1MB" };
+        return {
+          ok: false as const,
+          reason: "HTML exceeds 1MB",
+          status: response.status,
+          contentType: contentType || null,
+          htmlSize: contentLength,
+        };
       }
     }
 
     if (!response.body) {
-      return { ok: false as const, reason: "Empty response body" };
+      return {
+        ok: false as const,
+        reason: "Empty response body",
+        status: response.status,
+        contentType: contentType || null,
+        htmlSize: 0,
+      };
     }
 
     const reader = response.body.getReader();
@@ -171,7 +210,13 @@ async function fetchHtml(url: string, baseHost: string) {
 
       totalBytes += value.byteLength;
       if (totalBytes > MAX_HTML_BYTES) {
-        return { ok: false as const, reason: "HTML exceeds 1MB" };
+        return {
+          ok: false as const,
+          reason: "HTML exceeds 1MB",
+          status: response.status,
+          contentType: contentType || null,
+          htmlSize: totalBytes,
+        };
       }
 
       chunks.push(value);
@@ -189,13 +234,28 @@ async function fetchHtml(url: string, baseHost: string) {
       ok: true as const,
       html,
       resolvedUrl: resolvedUrl.toString(),
+      status: response.status,
+      contentType: contentType || null,
+      htmlSize: totalBytes,
     };
   } catch (error: any) {
     if (error?.name === "AbortError") {
-      return { ok: false as const, reason: "Request timeout" };
+      return {
+        ok: false as const,
+        reason: "Request timeout",
+        status: null,
+        contentType: null,
+        htmlSize: 0,
+      };
     }
 
-    return { ok: false as const, reason: "Request failed" };
+    return {
+      ok: false as const,
+      reason: "Request failed",
+      status: null,
+      contentType: null,
+      htmlSize: 0,
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -289,6 +349,7 @@ export async function POST(request: NextRequest) {
   );
 
   const candidateMap = new Map<string, Candidate>();
+  const debug: PageDebug[] = [];
   let scanned = 0;
 
   for (const pageUrl of pages) {
@@ -296,6 +357,14 @@ export async function POST(request: NextRequest) {
     scanned += 1;
 
     if (!fetchResult.ok) {
+      debug.push({
+        url: pageUrl,
+        status: fetchResult.status,
+        content_type: fetchResult.contentType,
+        html_size: fetchResult.htmlSize,
+        mailto_count: 0,
+        text_email_count: 0,
+      });
       continue;
     }
 
@@ -304,6 +373,17 @@ export async function POST(request: NextRequest) {
     const isContactPath = sourcePath === "/contact" || sourcePath === "/contact-us";
 
     const mailtoEmails = extractEmailsFromMailto(fetchResult.html);
+    const visibleTextEmails = extractEmailsFromText(extractVisibleText(fetchResult.html));
+
+    debug.push({
+      url: sourceUrl,
+      status: fetchResult.status,
+      content_type: fetchResult.contentType,
+      html_size: fetchResult.htmlSize,
+      mailto_count: mailtoEmails.length,
+      text_email_count: visibleTextEmails.length,
+    });
+
     for (const email of mailtoEmails) {
       upsertCandidate(candidateMap, {
         email,
@@ -312,7 +392,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const visibleTextEmails = extractEmailsFromText(extractVisibleText(fetchResult.html));
     for (const email of visibleTextEmails) {
       upsertCandidate(candidateMap, {
         email,
@@ -352,5 +431,6 @@ export async function POST(request: NextRequest) {
     found: candidates.length,
     inserted,
     candidates,
+    debug,
   });
 }
