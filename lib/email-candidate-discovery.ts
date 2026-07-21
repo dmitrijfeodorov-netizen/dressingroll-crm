@@ -29,6 +29,10 @@ export type ClinicDiscoveryInput = {
   website?: string | null;
 };
 
+export type DiscoveryOptions = {
+  reserveSerperSlot?: () => boolean;
+};
+
 export type DiscoveryResult = {
   scanned: number;
   candidates: DiscoveredCandidate[];
@@ -415,7 +419,10 @@ function upsertCandidate(
   }
 }
 
-export async function discoverEmailCandidatesForClinic(clinic: ClinicDiscoveryInput): Promise<DiscoveryResult> {
+export async function discoverEmailCandidatesForClinic(
+  clinic: ClinicDiscoveryInput,
+  options: DiscoveryOptions = {}
+): Promise<DiscoveryResult> {
   const existingEmail = String(clinic.email || "").trim();
   if (existingEmail) {
     return {
@@ -515,12 +522,16 @@ export async function discoverEmailCandidatesForClinic(clinic: ClinicDiscoveryIn
   const localFound = candidateMap.size;
 
   if (candidateMap.size === 0) {
-    externalSearch.attempted = true;
-
     const serperApiKey = String(process.env.SERPER_API_KEY || "").trim();
     if (!serperApiKey) {
       externalSearch.reason = "SERPER_API_KEY is not configured";
     } else {
+      const reserved = options.reserveSerperSlot ? options.reserveSerperSlot() : true;
+      if (!reserved) {
+        externalSearch.reason = "Serper budget exhausted";
+      } else {
+        externalSearch.attempted = true;
+
       const clinicDomain = normalizeDomain(baseHost);
       const query = `${clinicDomain} email`;
 
@@ -629,6 +640,7 @@ export async function discoverEmailCandidatesForClinic(clinic: ClinicDiscoveryIn
         externalSearch.reason = error?.name === "AbortError" ? "Serper request timeout" : "Serper unavailable";
       } finally {
         clearTimeout(timeout);
+      }
       }
     }
   } else {

@@ -6,8 +6,9 @@ import { getSupabaseAdmin } from "../../../../lib/supabase-admin";
 
 export const maxDuration = 60;
 
-const BATCH_LIMIT = 5;
-const CLINIC_WINDOW = 50;
+const MAX_CLINICS_PER_RUN = 12;
+const GROUP_SIZE = 3;
+const SERPER_BUDGET_LIMIT = 5;
 
 type ClinicRow = {
   id: string;
@@ -31,7 +32,7 @@ async function loadClinicWindow(afterClinicId: string | null) {
     .not("website", "is", null)
     .neq("website", "")
     .order("id", { ascending: true })
-    .limit(CLINIC_WINDOW);
+    .limit(MAX_CLINICS_PER_RUN);
 
   if (afterClinicId) {
     query = query.gt("id", afterClinicId);
@@ -61,6 +62,23 @@ async function updateCursor(lastClinicId: string) {
   }
 }
 
+type ClinicTaskResult = {
+  clinicId: string;
+  localFound: number;
+  externalAttempted: boolean;
+  inserted: number;
+  skipped: boolean;
+  errors: Array<{ clinicId: string; message: string }>;
+};
+
+function chunkClinics(clinics: ClinicRow[]) {
+  const groups: ClinicRow[][] = [];
+  for (let index = 0; index < clinics.length; index += GROUP_SIZE) {
+    groups.push(clinics.slice(index, index + GROUP_SIZE));
+  }
+  return groups;
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization") || "";
   const expectedSecret = process.env.CRON_SECRET || "";
@@ -87,20 +105,35 @@ export async function GET(request: Request) {
   }
 
   const cursor = (cursorData as CursorRow | null)?.last_clinic_id || null;
+  let serperBudgetUsed = 0;
+
+  function reserveSerperSlot() {
+    if (serperBudgetUsed >= SERPER_BUDGET_LIMIT) {
+      return false;
+    }
+
+    serperBudgetUsed += 1;
+    return true;
+  }
 
   let clinics = await loadClinicWindow(cursor);
-  if (cursor && clinics.length < BATCH_LIMIT) {
+  if (cursor && clinics.length < MAX_CLINICS_PER_RUN) {
     const wrapClinics = await loadClinicWindow(null);
     const seenClinicIds = new Set(clinics.map((clinic) => clinic.id));
     const wrapFiltered = wrapClinics.filter((clinic) => !seenClinicIds.has(clinic.id));
     clinics = [...clinics, ...wrapFiltered];
   }
 
+  clinics = clinics.slice(0, MAX_CLINICS_PER_RUN);
+
   if (clinics.length === 0) {
     return NextResponse.json({
       processed: 0,
       localFound: 0,
+      localOnlyProcessed: 0,
       externalAttempted: 0,
+      serperBudgetUsed,
+      serperBudgetLimit: SERPER_BUDGET_LIMIT,
       candidatesInserted: 0,
       skipped: 0,
       errors: [],
@@ -123,65 +156,106 @@ export async function GET(request: Request) {
 
   let processed = 0;
   let localFound = 0;
+  let localOnlyProcessed = 0;
   let externalAttempted = 0;
   let candidatesInserted = 0;
   let skipped = 0;
   const errors: Array<{ clinicId: string; message: string }> = [];
 
-  for (const clinic of clinics) {
-    if (processed + skipped >= BATCH_LIMIT) break;
+  async function processClinic(clinic: ClinicRow): Promise<ClinicTaskResult> {
+    if (pendingClinicIds.has(clinic.id)) {
+      return {
+        clinicId: clinic.id,
+        localFound: 0,
+        externalAttempted: false,
+        inserted: 0,
+        skipped: true,
+        errors: [],
+      };
+    }
 
-    try {
-      if (pendingClinicIds.has(clinic.id)) {
-        skipped += 1;
+    const discovery = await discoverEmailCandidatesForClinic(clinic, { reserveSerperSlot });
+    const taskErrors: Array<{ clinicId: string; message: string }> = [];
+    let inserted = 0;
+
+    for (const candidate of discovery.candidates) {
+      const { error } = await supabaseAdmin.from("clinic_email_candidates").insert({
+        owner_id: CRM_OWNER_ID,
+        clinic_id: clinic.id,
+        email: candidate.email,
+        source_url: candidate.source_url,
+        confidence: candidate.confidence,
+        status: "pending",
+      });
+
+      if (!error) {
+        inserted += 1;
         continue;
       }
 
-      const discovery = await discoverEmailCandidatesForClinic(clinic);
-      processed += 1;
-      localFound += discovery.localFound;
-      if (discovery.externalSearch.attempted) {
-        externalAttempted += 1;
+      if (String((error as { code?: string }).code || "") === "23505") {
+        continue;
       }
 
-      for (const candidate of discovery.candidates) {
-        const { error } = await supabaseAdmin.from("clinic_email_candidates").insert({
-          owner_id: CRM_OWNER_ID,
-          clinic_id: clinic.id,
-          email: candidate.email,
-          source_url: candidate.source_url,
-          confidence: candidate.confidence,
-          status: "pending",
-        });
+      taskErrors.push({ clinicId: clinic.id, message: `Candidate insert failed: ${error.message}` });
+    }
 
-        if (!error) {
-          candidatesInserted += 1;
-          continue;
+    return {
+      clinicId: clinic.id,
+      localFound: discovery.localFound,
+      externalAttempted: discovery.externalSearch.attempted,
+      inserted,
+      skipped: false,
+      errors: taskErrors,
+    };
+  }
+
+  const groups = chunkClinics(clinics);
+
+  for (const group of groups) {
+    const settled = await Promise.allSettled(group.map((clinic) => processClinic(clinic)));
+
+    settled.forEach((item, index) => {
+      const clinic = group[index];
+      if (item.status === "fulfilled") {
+        const result = item.value;
+        if (result.skipped) {
+          skipped += 1;
+          return;
         }
 
-        if (String((error as { code?: string }).code || "") === "23505") {
-          continue;
+        processed += 1;
+        localFound += result.localFound;
+        if (!result.externalAttempted) {
+          localOnlyProcessed += 1;
+        } else {
+          externalAttempted += 1;
         }
-
-        errors.push({ clinicId: clinic.id, message: `Candidate insert failed: ${error.message}` });
+        candidatesInserted += result.inserted;
+        errors.push(...result.errors);
+        return;
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown discovery error";
+
+      const message = item.reason instanceof Error ? item.reason.message : String(item.reason || "Unknown discovery error");
       errors.push({ clinicId: clinic.id, message });
-    } finally {
-      try {
-        await updateCursor(clinic.id);
-      } catch (cursorUpdateError) {
-        const message = cursorUpdateError instanceof Error ? cursorUpdateError.message : "Unknown cursor update error";
-        errors.push({ clinicId: clinic.id, message });
-      }
+    });
+
+    const lastClinicInGroup = group[group.length - 1];
+    try {
+      await updateCursor(lastClinicInGroup.id);
+    } catch (cursorUpdateError) {
+      const message = cursorUpdateError instanceof Error ? cursorUpdateError.message : "Unknown cursor update error";
+      errors.push({ clinicId: lastClinicInGroup.id, message });
     }
   }
 
   return NextResponse.json({
     processed,
     localFound,
+    localOnlyProcessed,
     externalAttempted,
+    serperBudgetUsed,
+    serperBudgetLimit: SERPER_BUDGET_LIMIT,
     candidatesInserted,
     skipped,
     errors,
