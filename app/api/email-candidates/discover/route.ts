@@ -575,16 +575,25 @@ export async function POST(request: NextRequest) {
         if (!serperResponse.ok) {
           externalSearch.reason = `Serper request failed (${serperResponse.status})`;
         } else {
-          const serperPayload = (await serperResponse.json().catch(() => ({}))) as {
-            organic?: SerperOrganicResult[];
-          };
+          const parsedPayload = await serperResponse.json().catch(() => null);
+          const isObjectPayload = Boolean(parsedPayload && typeof parsedPayload === "object" && !Array.isArray(parsedPayload));
+          const serperPayload = (isObjectPayload ? parsedPayload : null) as
+            | { organic?: SerperOrganicResult[]; message?: unknown }
+            | null;
 
-          const organicResults = Array.isArray(serperPayload.organic) ? serperPayload.organic : [];
-          externalSearch.resultsChecked = organicResults.length;
-
-          if (organicResults.length === 0) {
-            externalSearch.reason = "No organic results";
+          if (!serperPayload || !Array.isArray(serperPayload.organic)) {
+            const rawMessage = typeof serperPayload?.message === "string" ? serperPayload.message : "";
+            const safeMessage = rawMessage.replace(/\s+/g, " ").trim().slice(0, 180);
+            externalSearch.reason = safeMessage
+              ? `Invalid Serper response: ${safeMessage}`
+              : "Invalid Serper response";
           } else {
+            const organicResults = serperPayload.organic;
+            externalSearch.resultsChecked = organicResults.length;
+
+            if (organicResults.length === 0) {
+              externalSearch.reason = "No organic results";
+            } else {
             const pageFetchQueue: string[] = [];
 
             for (const result of organicResults) {
@@ -636,6 +645,7 @@ export async function POST(request: NextRequest) {
 
             externalSearch.found = candidateMap.size;
             externalSearch.reason = candidateMap.size > 0 ? "External candidate(s) found" : "No matching email found";
+            }
           }
         }
       } catch (error: any) {
