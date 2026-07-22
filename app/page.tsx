@@ -1105,6 +1105,7 @@ export default function Home(){
       const result = await response.json().catch(()=>({}));
 
       if(!response.ok){
+        await refreshAllData(false);
         alert(`Email failed: ${String(result?.error || "Unable to send email.")}`);
         return;
       }
