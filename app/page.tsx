@@ -1188,9 +1188,9 @@ export default function Home(){
           <section className="twoCol">
             <div className="panel"><div className="panelHead"><h3>Today's priorities</h3><span>Live</span></div>
               <ActionRow label="Answer replies first" value={metrics.replies} onClick={metrics.replies>0 ? buildQueue : undefined}/>
-              <ActionRow label="Process sample requests" value={metrics.samples}/>
-              <ActionRow label="Send follow-ups" value={metrics.follow}/>
-              <ActionRow label="Send new first-contact emails" value={Math.min(TODAY_QUEUE_NEW_LEADS_LIMIT,metrics.ready)}/>
+              <ActionRow label="Process sample requests" value={metrics.samples} onClick={metrics.samples>0 ? ()=>setSection("samples") : undefined}/>
+              <ActionRow label="Send follow-ups" value={metrics.follow} onClick={metrics.follow>0 ? buildQueue : undefined}/>
+              <ActionRow label="Send new first-contact emails" value={Math.min(TODAY_QUEUE_NEW_LEADS_LIMIT,metrics.ready)} onClick={metrics.ready>0 ? buildQueue : undefined}/>
             </div>
             <div className="panel"><div className="panelHead"><h3>Conversion pipeline</h3><span>{metrics.total} clinics</span></div>
               <Funnel label="Ready" value={metrics.ready} max={metrics.total}/>
