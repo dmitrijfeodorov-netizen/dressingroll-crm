@@ -924,7 +924,7 @@ export default function Home(){
 
   useEffect(()=>{
     const normalizedStatus = current ? normalizeStatusValue(current.status) : "";
-    const shouldShowReceivedReply = normalizedStatus==="replied" || normalizedStatus==="interested";
+    const shouldShowReceivedReply = normalizedStatus==="replied" || normalizedStatus==="interested" || normalizedStatus==="sample_requested";
 
     if(!current || !shouldShowReceivedReply){
       setQueueReply(null);
@@ -1218,7 +1218,7 @@ export default function Home(){
           :<div className="leadCard">
             <div className="leadTop"><div><span className="counter">{queueIndex+1} / {queue.length}</span><h2>{current.name}</h2><p>{current.services||"Podiatry clinic"}</p></div><span className="priority">Priority {current.priority}</span></div>
             <div className="details"><Detail label="Email" value={current.email||"Missing"}/><Detail label="City" value={current.city}/><Detail label="Status" value={formatStatusLabel(current.status)}/><Detail label="Next action" value={nextActionForClinic(current)}/></div>
-            {(normalizeStatusValue(current.status)==="replied" || normalizeStatusValue(current.status)==="interested")
+            {(normalizeStatusValue(current.status)==="replied" || normalizeStatusValue(current.status)==="interested" || normalizeStatusValue(current.status)==="sample_requested")
               ? <div className="emailBox" style={{whiteSpace:"pre-wrap"}}>
                 <b>Received reply</b>
                 {queueReplyLoading ? <p>Loading reply...</p>
@@ -1230,6 +1230,7 @@ export default function Home(){
                       {queueReply.received_at&&<p><b>Received:</b> {new Date(queueReply.received_at).toLocaleString()}</p>}
                       <p>{queueReply.body_text}</p>
                     </>}
+                {normalizeStatusValue(current.status)==="sample_requested"&&<p><b>Sample request saved. Process it in Samples.</b></p>}
               </div>
               : <pre className="emailBox">{getTodayQueueEmailPreview(current)}</pre>}
             <div className="leadActions">
@@ -1244,7 +1245,8 @@ export default function Home(){
                 <button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>
               </>}
               {normalizeStatusValue(current.status)==="interested"&&<button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>}
-              {current.email&&normalizeStatusValue(current.status)!=="replied"&&normalizeStatusValue(current.status)!=="interested"&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
+              {normalizeStatusValue(current.status)==="sample_requested"&&<button onClick={()=>setSection("samples")}>Open Samples</button>}
+              {current.email&&normalizeStatusValue(current.status)!=="replied"&&normalizeStatusValue(current.status)!=="interested"&&normalizeStatusValue(current.status)!=="sample_requested"&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
               <button onClick={()=>setQueueIndex(i=>i+1)}>Skip</button>
               <button onClick={()=>setSelectedId(current.id)}>Open Clinic Card</button>
             </div>
