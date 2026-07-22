@@ -86,7 +86,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Template not found for owner" }, { status: 404 });
   }
 
-  const isFollowUp = String(template.category || "").toLowerCase().startsWith("follow-up");
+  const templateCategory = String(template.category || "").trim().toLowerCase();
+  const isFollowUp = templateCategory.startsWith("follow-up") || templateCategory === "sample follow-up";
 
   let contact:
     | { id: string; email: string | null; first_name: string | null; last_name: string | null }
