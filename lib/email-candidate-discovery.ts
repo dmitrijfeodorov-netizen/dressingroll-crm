@@ -73,7 +73,7 @@ function normalizeHost(host: string) {
 }
 
 function normalizeDomain(domain: string) {
-  return normalizeHost(domain).trim();
+  return normalizeHost(domain).trim().replace(/\.+$/, "");
 }
 
 function isSameDomain(baseHost: string, candidateHost: string) {
@@ -95,6 +95,32 @@ function isClinicDomainMatch(candidateEmail: string, clinicDomain: string) {
   const cDomain = normalizeDomain(clinicDomain);
   if (!eDomain || !cDomain) return false;
   return eDomain === cDomain || eDomain.endsWith(`.${cDomain}`);
+}
+
+const FREEMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "yahoo.co.uk",
+  "ymail.com",
+  "rocketmail.com",
+  "icloud.com",
+  "me.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "gmx.com",
+  "mail.com",
+  "zoho.com",
+]);
+
+function isFreemailDomain(domain: string) {
+  const normalized = normalizeDomain(domain);
+  return FREEMAIL_DOMAINS.has(normalized);
 }
 
 function isPublicHttpUrl(raw: string) {
@@ -223,6 +249,23 @@ function collectSafeEmails(input: string, clinicDomain: string) {
   return extractEmailsFromText(input).filter(
     (email) => isValidEmail(email) && !isRejectedEmail(email) && isClinicDomainMatch(email, clinicDomain)
   );
+}
+
+type CandidateSource = "local_html" | "external_search";
+
+function isAcceptedCandidateEmail(email: string, clinicDomain: string, source: CandidateSource) {
+  if (!isValidEmail(email) || isRejectedEmail(email)) return false;
+
+  if (isClinicDomainMatch(email, clinicDomain)) return true;
+
+  const domain = emailDomain(email);
+  if (!domain) return false;
+
+  if (source === "local_html") {
+    return isFreemailDomain(domain);
+  }
+
+  return false;
 }
 
 async function fetchExternalHtml(url: string) {
@@ -435,9 +478,11 @@ async function fetchHtml(url: string, baseHost: string) {
 
 function upsertCandidate(
   map: Map<string, DiscoveredCandidate>,
-  candidate: DiscoveredCandidate
+  candidate: DiscoveredCandidate,
+  clinicDomain: string,
+  source: CandidateSource
 ) {
-  if (isRejectedEmail(candidate.email)) return;
+  if (!isAcceptedCandidateEmail(candidate.email, clinicDomain, source)) return;
 
   const existing = map.get(candidate.email);
   if (!existing) {
@@ -477,6 +522,7 @@ export async function discoverEmailCandidatesForClinic(
   }
 
   const baseHost = baseWebsite.hostname;
+  const clinicDomain = normalizeDomain(baseHost);
   const rootOrigin = baseWebsite.origin;
 
   const pages = Array.from(
@@ -538,7 +584,7 @@ export async function discoverEmailCandidatesForClinic(
         email,
         source_url: sourceUrl,
         confidence: "high",
-      });
+      }, clinicDomain, "local_html");
     }
 
     for (const email of visibleTextEmails) {
@@ -546,7 +592,7 @@ export async function discoverEmailCandidatesForClinic(
         email,
         source_url: sourceUrl,
         confidence: isContactPath ? "high" : "medium",
-      });
+      }, clinicDomain, "local_html");
     }
   }
 
@@ -563,7 +609,6 @@ export async function discoverEmailCandidatesForClinic(
       } else {
         externalSearch.attempted = true;
 
-      const clinicDomain = normalizeDomain(baseHost);
       const query = `${clinicDomain} email`;
 
       const controller = new AbortController();
@@ -627,7 +672,7 @@ export async function discoverEmailCandidatesForClinic(
                     email,
                     source_url: sourceUrl,
                     confidence: "medium",
-                  });
+                  }, clinicDomain, "external_search");
                 }
 
                 if (snippetEmails.length === 0 && pageFetchQueue.length < EXTERNAL_RESULT_FETCH_LIMIT) {
@@ -655,7 +700,7 @@ export async function discoverEmailCandidatesForClinic(
                       email,
                       source_url: fetched.resolvedUrl,
                       confidence: "medium",
-                    });
+                    }, clinicDomain, "external_search");
                   }
 
                   if (candidateMap.size > 0) break;
