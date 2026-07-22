@@ -296,6 +296,17 @@ function isIrrelevantRoleEmail(email: string) {
     "privacy",
     "dpo",
     "webmaster",
+    "hr",
+    "humanresources",
+    "people",
+    "informationgovernance",
+    "igofficer",
+    "dataprotection",
+    "safeguarding",
+    "complaints",
+    "procurement",
+    "suppliers",
+    "payroll",
   ];
 
   return blockedPrefixes.some((prefix) => normalizedLocal === prefix || normalizedLocal.startsWith(prefix));
