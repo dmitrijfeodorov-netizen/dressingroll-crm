@@ -1144,6 +1144,21 @@ export default function Home(){
         alert("Quote was already marked as sent or the clinic is not ready for a quote.");
         return;
       }
+    } else if(action==="first_order"){
+      const { data, error } = await supabase
+        .from("clinics")
+        .update({ status: rule.status })
+        .eq("id", clinic.id)
+        .eq("owner_id", OWNER_ID)
+        .in("status", ["quote_sent", "negotiation"])
+        .select("id")
+        .maybeSingle();
+
+      clinicError = error;
+      if(!clinicError && !data){
+        alert("First order was already recorded or the clinic is not ready for this step.");
+        return;
+      }
     } else {
       const { error } = await supabase
         .from("clinics")
