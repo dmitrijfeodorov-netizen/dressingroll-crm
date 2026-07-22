@@ -268,6 +268,63 @@ function isAcceptedCandidateEmail(email: string, clinicDomain: string, source: C
   return false;
 }
 
+function localPart(email: string) {
+  const normalized = normalizeEmail(email);
+  const at = normalized.indexOf("@");
+  return at >= 0 ? normalized.slice(0, at) : normalized;
+}
+
+function normalizeLocalPartForRole(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[._-]+/g, "");
+}
+
+function isIrrelevantRoleEmail(email: string) {
+  const normalizedLocal = normalizeLocalPartForRole(localPart(email));
+  if (!normalizedLocal) return false;
+
+  const blockedPrefixes = [
+    "careers",
+    "jobs",
+    "recruitment",
+    "property",
+    "press",
+    "media",
+    "legal",
+    "privacy",
+    "dpo",
+    "webmaster",
+  ];
+
+  return blockedPrefixes.some((prefix) => normalizedLocal === prefix || normalizedLocal.startsWith(prefix));
+}
+
+function emailRelevanceScore(email: string) {
+  const normalizedLocal = normalizeLocalPartForRole(localPart(email));
+
+  if (normalizedLocal === "reception") return 100;
+  if (normalizedLocal === "enquiries" || normalizedLocal === "inquiries") return 99;
+  if (normalizedLocal === "info") return 98;
+  if (normalizedLocal === "contact") return 97;
+  if (normalizedLocal === "office") return 96;
+  if (normalizedLocal === "bookings") return 95;
+  if (normalizedLocal === "admin") return 94;
+  if (normalizedLocal === "hello") return 93;
+
+  if (normalizedLocal === "customercare" || normalizedLocal === "support" || normalizedLocal === "communications") {
+    return 40;
+  }
+
+  // Keep non-placeholder personal/local mailbox names with neutral priority.
+  return 60;
+}
+
+function confidenceRank(value: DiscoveredCandidate["confidence"]) {
+  return value === "high" ? 2 : 1;
+}
+
 async function fetchExternalHtml(url: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), EXTERNAL_FETCH_TIMEOUT_MS);
@@ -723,7 +780,20 @@ export async function discoverEmailCandidatesForClinic(
     externalSearch.reason = "Skipped: local website search found candidate(s)";
   }
 
-  const candidates = Array.from(candidateMap.values()).sort((a, b) => a.email.localeCompare(b.email));
+  const candidates = Array.from(candidateMap.values())
+    .filter((candidate) => !isIrrelevantRoleEmail(candidate.email))
+    .map((candidate, index) => ({ candidate, index }))
+    .sort((a, b) => {
+      const scoreDiff = emailRelevanceScore(b.candidate.email) - emailRelevanceScore(a.candidate.email);
+      if (scoreDiff !== 0) return scoreDiff;
+
+      const confidenceDiff = confidenceRank(b.candidate.confidence) - confidenceRank(a.candidate.confidence);
+      if (confidenceDiff !== 0) return confidenceDiff;
+
+      return a.index - b.index;
+    })
+    .map((item) => item.candidate)
+    .slice(0, 3);
 
   return {
     scanned,
