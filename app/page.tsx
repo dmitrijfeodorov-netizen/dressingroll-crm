@@ -1111,6 +1111,7 @@ export default function Home(){
   async function runWorkflowAction(clinic:Clinic, action:WorkflowActionKey){
     const rule = WORKFLOW_ACTIONS[action];
     const occurredAt = new Date().toISOString();
+    let postSuccessWarning = "";
 
     let clinicError: any = null;
 
@@ -1158,6 +1159,25 @@ export default function Home(){
       if(!clinicError && !data){
         alert("First order was already recorded or the clinic is not ready for this step.");
         return;
+      }
+
+      if(!clinicError && data){
+        const { error: closeFollowUpsError } = await supabase
+          .from("follow_ups")
+          .update({ status:"completed" })
+          .eq("owner_id", OWNER_ID)
+          .eq("clinic_id", clinic.id)
+          .in("status", ["pending", "overdue"]);
+
+        if(closeFollowUpsError){
+          console.error("Unable to complete follow-ups after first order:", {
+            message: closeFollowUpsError.message,
+            details: closeFollowUpsError.details,
+            hint: closeFollowUpsError.hint,
+            code: closeFollowUpsError.code,
+          });
+          postSuccessWarning = "First order was recorded, but open follow-ups could not be closed.";
+        }
       }
     } else {
       const { error } = await supabase
@@ -1230,6 +1250,10 @@ export default function Home(){
     }
 
     await refreshAllData(false);
+
+    if(postSuccessWarning){
+      alert(postSuccessWarning);
+    }
   }
 
   function exportCsv(){
