@@ -268,10 +268,27 @@ export async function POST(request: NextRequest) {
     }
 
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
-    const sendResponse = await gmail.users.messages.send({
-      userId: "me",
-      requestBody: { raw },
-    });
+    let sendResponse;
+    try {
+      sendResponse = await gmail.users.messages.send({
+        userId: "me",
+        requestBody: { raw },
+      });
+    } catch (error: any) {
+      const status = Number(error?.response?.status || error?.status || 0) || "unknown";
+      const code = String(error?.code || error?.response?.data?.error?.code || "unknown");
+      const safeMessage = String(
+        error?.response?.data?.error?.message || error?.message || "Unknown Gmail send error"
+      );
+
+      console.error("Gmail send failed:", {
+        status,
+        code,
+        message: safeMessage,
+      });
+
+      throw new Error(`Gmail send failed (${status}): ${safeMessage}`);
+    }
 
     const gmailMessageId = sendResponse.data.id || "";
     const gmailThreadId = sendResponse.data.threadId || null;
