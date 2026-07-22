@@ -445,6 +445,9 @@ export default function Home(){
   const [gmailSyncMessage,setGmailSyncMessage]=useState("");
   const [queue,setQueue]=useState<string[]>([]);
   const [queueIndex,setQueueIndex]=useState(0);
+  const [queueReply,setQueueReply]=useState<ReceivedReply|null>(null);
+  const [queueReplyLoading,setQueueReplyLoading]=useState(false);
+  const [queueReplyError,setQueueReplyError]=useState("");
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [sidebarOpen,setSidebarOpen]=useState(false);
   const [pendingCandidates,setPendingCandidates]=useState<PendingEmailCandidate[]>([]);
@@ -919,6 +922,66 @@ export default function Home(){
     setSection("today");
   }
 
+  useEffect(()=>{
+    if(!current || normalizeStatusValue(current.status)!=="replied"){
+      setQueueReply(null);
+      setQueueReplyLoading(false);
+      setQueueReplyError("");
+      return;
+    }
+
+    const clinicId = current.id;
+    let cancelled = false;
+
+    async function loadLatestQueueReply(){
+      setQueueReplyLoading(true);
+      setQueueReplyError("");
+
+      const { data, error } = await supabase
+        .from("email_messages")
+        .select("id, owner_id, clinic_id, sender, subject, body_text, received_at")
+        .eq("owner_id", OWNER_ID)
+        .eq("clinic_id", clinicId)
+        .eq("direction", "inbound")
+        .eq("processing_status", "processed")
+        .order("received_at", { ascending:false })
+        .limit(1);
+
+      if(cancelled) return;
+
+      if(error){
+        setQueueReply(null);
+        setQueueReplyError("Unable to load received reply.");
+        setQueueReplyLoading(false);
+        return;
+      }
+
+      const row = ((data as any[] | null) || [])[0];
+      if(!row){
+        setQueueReply(null);
+        setQueueReplyLoading(false);
+        return;
+      }
+
+      setQueueReply({
+        id:String(row.id || ""),
+        owner_id:String(row.owner_id || ""),
+        clinic_id:String(row.clinic_id || ""),
+        sender:String(row.sender || ""),
+        subject:String(row.subject || ""),
+        body_text:String(row.body_text || ""),
+        received_at:String(row.received_at || ""),
+      });
+      setQueueReplyLoading(false);
+    }
+
+    void loadLatestQueueReply();
+
+    return ()=>{
+      cancelled = true;
+    };
+  }, [current]);
+
   async function openGmail(c: Clinic) {
     const follow = c.status === "follow_up_due";
     const requiredCategory = follow ? "Follow-up 1" : "First Contact";
@@ -1152,7 +1215,20 @@ export default function Home(){
           :<div className="leadCard">
             <div className="leadTop"><div><span className="counter">{queueIndex+1} / {queue.length}</span><h2>{current.name}</h2><p>{current.services||"Podiatry clinic"}</p></div><span className="priority">Priority {current.priority}</span></div>
             <div className="details"><Detail label="Email" value={current.email||"Missing"}/><Detail label="City" value={current.city}/><Detail label="Status" value={formatStatusLabel(current.status)}/><Detail label="Next action" value={current.nextAction}/></div>
-            <pre className="emailBox">{getTodayQueueEmailPreview(current)}</pre>
+            {normalizeStatusValue(current.status)==="replied"
+              ? <div className="emailBox" style={{whiteSpace:"pre-wrap"}}>
+                <b>Received reply</b>
+                {queueReplyLoading ? <p>Loading reply...</p>
+                  : queueReplyError ? <p>{queueReplyError}</p>
+                  : !queueReply || !queueReply.body_text
+                    ? <p>Reply text is unavailable.</p>
+                    : <>
+                      {queueReply.subject&&<p><b>Subject:</b> {queueReply.subject}</p>}
+                      {queueReply.received_at&&<p><b>Received:</b> {new Date(queueReply.received_at).toLocaleString()}</p>}
+                      <p>{queueReply.body_text}</p>
+                    </>}
+              </div>
+              : <pre className="emailBox">{getTodayQueueEmailPreview(current)}</pre>}
             <div className="leadActions">
               {current.website&&<a href={current.website} target="_blank">Open Website</a>}
               {normalizeStatusValue(current.status)==="replied"&&<>
