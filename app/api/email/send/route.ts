@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     await Promise.all([
       supabaseAdmin
         .from("clinics")
-        .select("id, owner_id, clinic_name, city, website, email")
+        .select("id, owner_id, clinic_name, city, website, email, status")
         .eq("id", clinicId)
         .eq("owner_id", CRM_OWNER_ID)
         .maybeSingle(),
@@ -88,6 +88,11 @@ export async function POST(request: NextRequest) {
 
   const templateCategory = String(template.category || "").trim().toLowerCase();
   const isFollowUp = templateCategory.startsWith("follow-up") || templateCategory === "sample follow-up";
+  const isFirstContact = !isFollowUp;
+
+  let gmailSendConfirmed = false;
+  let clinicSendingReserved = false;
+  let followUpSendingReservation: { id: string; status: string } | null = null;
 
   let contact:
     | { id: string; email: string | null; first_name: string | null; last_name: string | null }
@@ -193,6 +198,75 @@ export async function POST(request: NextRequest) {
   const raw = toBase64Url(mime);
 
   try {
+    if (isFirstContact) {
+      const { data: reservedClinic, error: reserveClinicError } = await supabaseAdmin
+        .from("clinics")
+        .update({ status: "sending" })
+        .eq("id", clinicId)
+        .eq("owner_id", CRM_OWNER_ID)
+        .eq("status", "ready_to_email")
+        .select("id")
+        .maybeSingle();
+
+      if (reserveClinicError) {
+        throw reserveClinicError;
+      }
+
+      if (!reservedClinic) {
+        return NextResponse.json(
+          { error: "Email is already being sent or was already sent." },
+          { status: 409 }
+        );
+      }
+
+      clinicSendingReserved = true;
+    } else {
+      const { data: followUpTask, error: followUpLookupError } = await supabaseAdmin
+        .from("follow_ups")
+        .select("id, status")
+        .eq("owner_id", CRM_OWNER_ID)
+        .eq("clinic_id", clinicId)
+        .in("status", ["pending", "overdue"])
+        .order("due_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (followUpLookupError) {
+        throw followUpLookupError;
+      }
+
+      if (!followUpTask) {
+        return NextResponse.json(
+          { error: "Follow-up is already being sent or was already completed." },
+          { status: 409 }
+        );
+      }
+
+      const originalFollowUpStatus = String(followUpTask.status || "");
+      const { data: reservedFollowUp, error: reserveFollowUpError } = await supabaseAdmin
+        .from("follow_ups")
+        .update({ status: "sending" })
+        .eq("owner_id", CRM_OWNER_ID)
+        .eq("clinic_id", clinicId)
+        .eq("id", followUpTask.id)
+        .eq("status", originalFollowUpStatus)
+        .select("id")
+        .maybeSingle();
+
+      if (reserveFollowUpError) {
+        throw reserveFollowUpError;
+      }
+
+      if (!reservedFollowUp) {
+        return NextResponse.json(
+          { error: "Follow-up is already being sent or was already completed." },
+          { status: 409 }
+        );
+      }
+
+      followUpSendingReservation = { id: followUpTask.id, status: originalFollowUpStatus };
+    }
+
     const gmail = google.gmail({ version: "v1", auth: oauth2Client });
     const sendResponse = await gmail.users.messages.send({
       userId: "me",
@@ -206,19 +280,12 @@ export async function POST(request: NextRequest) {
       throw new Error("Gmail API did not return a message ID");
     }
 
+    gmailSendConfirmed = true;
+
     const nowIso = new Date().toISOString();
     const due = new Date();
     due.setDate(due.getDate() + 7);
     due.setHours(12, 0, 0, 0);
-
-    if (isFollowUp) {
-      await supabaseAdmin
-        .from("follow_ups")
-        .update({ status: "completed" })
-        .eq("owner_id", CRM_OWNER_ID)
-        .eq("clinic_id", clinicId)
-        .in("status", ["pending", "overdue"]);
-    }
 
     await supabaseAdmin.from("email_messages").insert({
       owner_id: CRM_OWNER_ID,
@@ -237,16 +304,6 @@ export async function POST(request: NextRequest) {
       created_at: nowIso,
     });
 
-    await supabaseAdmin
-      .from("clinics")
-      .update({
-        status: "email_sent",
-        last_contacted_at: nowIso,
-        next_follow_up_at: due.toISOString(),
-      })
-      .eq("id", clinicId)
-      .eq("owner_id", CRM_OWNER_ID);
-
     await supabaseAdmin.from("activities").insert({
       owner_id: CRM_OWNER_ID,
       clinic_id: clinicId,
@@ -264,6 +321,35 @@ export async function POST(request: NextRequest) {
       description: isFollowUp ? "Review reply after follow-up email" : "Follow up after first email",
       created_at: nowIso,
     });
+
+    if (isFollowUp && followUpSendingReservation) {
+      const { error: completeFollowUpError } = await supabaseAdmin
+        .from("follow_ups")
+        .update({ status: "completed" })
+        .eq("owner_id", CRM_OWNER_ID)
+        .eq("clinic_id", clinicId)
+        .eq("id", followUpSendingReservation.id)
+        .eq("status", "sending");
+
+      if (completeFollowUpError) {
+        throw completeFollowUpError;
+      }
+    }
+
+    const { error: clinicFinalizeError } = await supabaseAdmin
+      .from("clinics")
+      .update({
+        status: "email_sent",
+        last_contacted_at: nowIso,
+        next_follow_up_at: due.toISOString(),
+      })
+      .eq("id", clinicId)
+      .eq("owner_id", CRM_OWNER_ID)
+      .eq("status", isFirstContact ? "sending" : clinic.status);
+
+    if (clinicFinalizeError) {
+      throw clinicFinalizeError;
+    }
 
     const latestCreds = oauth2Client.credentials;
     if (latestCreds?.access_token) {
@@ -286,6 +372,44 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Gmail send error";
 
+    if (!gmailSendConfirmed) {
+      if (clinicSendingReserved) {
+        const { error: revertClinicError } = await supabaseAdmin
+          .from("clinics")
+          .update({ status: "ready_to_email" })
+          .eq("id", clinicId)
+          .eq("owner_id", CRM_OWNER_ID)
+          .eq("status", "sending");
+
+        if (revertClinicError) {
+          console.error("Unable to revert clinic send reservation:", {
+            message: revertClinicError.message,
+            details: revertClinicError.details,
+            hint: revertClinicError.hint,
+            code: revertClinicError.code,
+          });
+        }
+      }
+
+      if (followUpSendingReservation) {
+        const { error: revertFollowUpError } = await supabaseAdmin
+          .from("follow_ups")
+          .update({ status: followUpSendingReservation.status })
+          .eq("owner_id", CRM_OWNER_ID)
+          .eq("clinic_id", clinicId)
+          .eq("id", followUpSendingReservation.id)
+          .eq("status", "sending");
+
+        if (revertFollowUpError) {
+          console.error("Unable to revert follow-up send reservation:", {
+            message: revertFollowUpError.message,
+            details: revertFollowUpError.details,
+            hint: revertFollowUpError.hint,
+            code: revertFollowUpError.code,
+          });
+        }
+      }
+
     await supabaseAdmin.from("email_messages").insert({
       owner_id: CRM_OWNER_ID,
       clinic_id: clinicId,
@@ -301,19 +425,31 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     });
 
+      return NextResponse.json(
+        {
+          error: `Unable to send email: ${message}`,
+          reconnectRequired: /invalid_grant|invalid_token/i.test(message),
+          draft: {
+            to: toAddress,
+            subject: renderedSubject,
+            html: fullHtml,
+            text: textBody,
+            templateName: template.name,
+          },
+        },
+        { status: 502 }
+      );
+    }
+
+    console.error("Email was confirmed by Gmail but a database write failed:", {
+      message,
+    });
+
     return NextResponse.json(
       {
-        error: `Unable to send email: ${message}`,
-        reconnectRequired: /invalid_grant|invalid_token/i.test(message),
-        draft: {
-          to: toAddress,
-          subject: renderedSubject,
-          html: fullHtml,
-          text: textBody,
-          templateName: template.name,
-        },
+        error: "Email was sent in Gmail, but saving the result failed. Please check the record manually.",
       },
-      { status: 502 }
+      { status: 500 }
     );
   }
 }
