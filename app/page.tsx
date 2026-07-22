@@ -347,6 +347,40 @@ function applyTemplateVariables(templateText:string, clinic:Clinic, contactName:
   return Object.entries(replacements).reduce((acc,[token,value])=>acc.split(token).join(value), templateText);
 }
 
+function cleanReceivedReply(raw:string){
+  try {
+    const source = String(raw || "");
+    if(!source) return source;
+
+    const normalized = source.replace(/\r\n/g, "\n");
+    const lines = normalized.split("\n");
+    const onWrotePattern = /^\s*On\s.+wrote:\s*$/i;
+
+    let cutIndex = -1;
+    for(let i=0;i<lines.length;i+=1){
+      if(onWrotePattern.test(lines[i])){
+        cutIndex = i;
+        break;
+      }
+    }
+
+    let resultLines = lines;
+    if(cutIndex>=0){
+      resultLines = lines.slice(0, cutIndex);
+
+      // Also remove trailing quoted lines if they were kept above the separator.
+      while(resultLines.length && /^\s*>/.test(resultLines[resultLines.length-1])){
+        resultLines.pop();
+      }
+    }
+
+    const cleaned = resultLines.join("\n").trim();
+    return cleaned || source;
+  } catch {
+    return String(raw || "");
+  }
+}
+
 function nextActionForClinic(clinic:{email:string;status:string}){
   if(!clinic.email) return "Find email";
   if(clinic.status==="research") return "Review clinic";
@@ -1248,7 +1282,8 @@ export default function Home(){
                     : <>
                       {queueReply.subject&&<p><b>Subject:</b> {queueReply.subject}</p>}
                       {queueReply.received_at&&<p><b>Received:</b> {new Date(queueReply.received_at).toLocaleString()}</p>}
-                      <p>{queueReply.body_text}</p>
+                      <p style={{whiteSpace:"pre-wrap"}}>{cleanReceivedReply(queueReply.body_text)}</p>
+                      {cleanReceivedReply(queueReply.body_text)!==queueReply.body_text&&<details><summary>Show full reply</summary><p style={{whiteSpace:"pre-wrap"}}>{queueReply.body_text}</p></details>}
                     </>}
                 {normalizeStatusValue(current.status)==="sample_requested"&&<p><b>Sample request saved. Process it in Samples.</b></p>}
               </div>
@@ -2381,7 +2416,11 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       <div className="timeline">
         {receivedRepliesLoading ? <p className="muted">Loading replies…</p>
           : receivedReplies.length===0 ? <p className="muted">No replies yet</p>
-          : receivedReplies.map((reply)=><div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p>{reply.body_text||"—"}</p></div></div>)}
+          : receivedReplies.map((reply)=>{
+            const cleanedReply = cleanReceivedReply(reply.body_text || "");
+            const showFullReply = cleanedReply !== (reply.body_text || "");
+            return <div className="timelineItem" key={reply.id}><i/><div><b>{reply.subject||"(no subject)"}</b><span>{reply.received_at?new Date(reply.received_at).toLocaleString():"—"}</span><p><b>From:</b> {reply.sender||"—"}</p><p style={{whiteSpace:"pre-wrap"}}>{cleanedReply||"—"}</p>{showFullReply&&<details><summary>Show full reply</summary><p style={{whiteSpace:"pre-wrap"}}>{reply.body_text||"—"}</p></details>}</div></div>;
+          })}
       </div>
     </div>
 
