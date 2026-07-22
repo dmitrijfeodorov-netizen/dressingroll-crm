@@ -2240,6 +2240,38 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
     onClose();
   }
 
+  async function copyClinicAddress(){
+    const rawLines = [
+      d.name,
+      d.addressLine1,
+      d.addressLine2,
+      d.city,
+      d.county,
+      d.postcode,
+      d.country,
+    ];
+
+    const uniqueLines:string[] = [];
+    const seen = new Set<string>();
+
+    for(const value of rawLines){
+      const line = String(value || "").trim();
+      if(!line || line === "—") continue;
+      if(seen.has(line)) continue;
+      seen.add(line);
+      uniqueLines.push(line);
+    }
+
+    const addressText = uniqueLines.join("\n");
+
+    try {
+      await navigator.clipboard.writeText(addressText);
+      alert("Address copied");
+    } catch {
+      alert("Unable to copy address");
+    }
+  }
+
   return <div className="drawerBackdrop" onClick={onClose}><aside className="drawer" onClick={e=>e.stopPropagation()}>
     <div className="drawerHead"><div><span className="pill pA">Priority {d.priority}</span><h2>{d.name}</h2><p>{d.city} · {d.region}</p></div><button onClick={onClose}>×</button></div>
 
@@ -2250,6 +2282,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
       <button onClick={()=>triggerWorkflow("sample_sent")} disabled={workflowSaving}>Sample Sent</button>
       <button onClick={()=>triggerWorkflow("quote_sent")} disabled={workflowSaving}>Quote Sent</button>
       <button onClick={()=>triggerWorkflow("first_order")} disabled={workflowSaving}>First Order</button>
+      {(normalizeStatusValue(d.status)==="sample_requested" || normalizeStatusValue(d.status)==="sample_sent")&&<button onClick={copyClinicAddress} disabled={workflowSaving}>Copy address</button>}
     </div>
     {emailTemplates.length===0&&<p className="muted" style={{padding:"0 1.4rem"}}>Create at least one template in Email Templates to use this action.</p>}
 
