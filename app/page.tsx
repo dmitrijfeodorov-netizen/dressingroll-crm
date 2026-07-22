@@ -116,6 +116,7 @@ type FollowUp = {
   clinic_id:string;
   due_at:string;
   status:string;
+  title:string;
   description:string;
   created_at:string;
 };
@@ -169,10 +170,14 @@ const EMAIL_TEMPLATE_CATEGORIES = [
   "First Contact",
   "Follow-up 1",
   "Follow-up 2",
+  "Sample Follow-up",
   "Sample",
   "Quote",
   "Custom",
 ] as const;
+
+const SAMPLE_FOLLOW_UP_CATEGORY = "Sample Follow-up";
+const SAMPLE_FOLLOW_UP_MISSING_MESSAGE = "Create a Sample Follow-up email template first.";
 
 const EMAIL_TEMPLATE_VARIABLES = [
   "{{clinic_name}}",
@@ -435,6 +440,13 @@ function isOverdueFollowUp(followUp:FollowUp){
 function isDueFollowUp(followUp:FollowUp){
   return OPEN_FOLLOW_UP_STATUSES.has(followUp.status) && dateOnly(followUp.due_at) <= iso();
 }
+
+function isSampleFeedbackFollowUp(followUp:FollowUp){
+  const title = String(followUp.title || "").toLowerCase();
+  const description = String(followUp.description || "").toLowerCase();
+  return title.includes("sample feedback") || description.includes("sample feedback");
+}
+
 function clinicToRow
 (c:Clinic) {
   return {
@@ -519,7 +531,7 @@ export default function Home(){
   async function loadFollowUps(){
     const { data, error } = await supabase
       .from("follow_ups")
-      .select("id, owner_id, clinic_id, due_at, status, description, created_at")
+      .select("id, owner_id, clinic_id, due_at, status, title, description, created_at")
       .eq("owner_id", OWNER_ID)
       .order("due_at", { ascending:true });
 
@@ -535,15 +547,18 @@ export default function Home(){
     }
 
     const rows=(data as any[] | null) || [];
-    setFollowUps(rows.map((row)=>({
-      id:String(row.id),
-      owner_id:String(row.owner_id),
-      clinic_id:String(row.clinic_id),
-      due_at:String(row.due_at || ""),
-      status:String(row.status || ""),
-      description:String(row.description || ""),
-      created_at:String(row.created_at || ""),
-    })));
+    setFollowUps(rows.map((row)=>(
+      {
+        id:String(row.id),
+        owner_id:String(row.owner_id),
+        clinic_id:String(row.clinic_id),
+        due_at:String(row.due_at || ""),
+        status:String(row.status || ""),
+        title:String(row.title || ""),
+        description:String(row.description || ""),
+        created_at:String(row.created_at || ""),
+      }
+    )));
   }
 
   async function loadPendingEmailCandidates(){
@@ -1020,11 +1035,24 @@ export default function Home(){
   }, [current]);
 
   async function openGmail(c: Clinic) {
-    const follow = c.status === "follow_up_due";
-    const requiredCategory = follow ? "Follow-up 1" : "First Contact";
+    const follow = normalizeStatusValue(c.status) === "follow_up_due";
+    const isSampleFollowUp = followUps.some((item)=>
+      item.clinic_id === c.id
+      && OPEN_FOLLOW_UP_STATUSES.has(item.status)
+      && isSampleFeedbackFollowUp(item)
+    );
+    const requiredCategory = isSampleFollowUp
+      ? SAMPLE_FOLLOW_UP_CATEGORY
+      : follow
+        ? "Follow-up 1"
+        : "First Contact";
     const template = emailTemplates.find((item)=>item.category===requiredCategory);
 
     if(!template){
+      if(isSampleFollowUp){
+        alert(SAMPLE_FOLLOW_UP_MISSING_MESSAGE);
+        return;
+      }
       alert(`Missing email template for category: ${requiredCategory}`);
       return;
     }
@@ -1060,10 +1088,20 @@ export default function Home(){
 
   function getTodayQueueEmailPreview(clinic: Clinic) {
     const isFollowUp = normalizeStatusValue(clinic.status) === "follow_up_due";
-    const requiredCategory = isFollowUp ? "Follow-up 1" : "First Contact";
+    const isSampleFollowUp = isFollowUp && followUps.some((item)=>
+      item.clinic_id === clinic.id
+      && OPEN_FOLLOW_UP_STATUSES.has(item.status)
+      && isSampleFeedbackFollowUp(item)
+    );
+    const requiredCategory = isSampleFollowUp
+      ? SAMPLE_FOLLOW_UP_CATEGORY
+      : isFollowUp
+        ? "Follow-up 1"
+        : "First Contact";
     const template = emailTemplates.find((item) => item.category === requiredCategory);
 
     if (!template) {
+      if(isSampleFollowUp) return SAMPLE_FOLLOW_UP_MISSING_MESSAGE;
       return `Missing email template for category: ${requiredCategory}`;
     }
 
@@ -1752,7 +1790,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
     try {
       const { data, error } = await supabase
         .from("follow_ups")
-        .select("id, owner_id, clinic_id, due_at, status, description, created_at")
+        .select("id, owner_id, clinic_id, due_at, status, title, description, created_at")
         .eq("clinic_id", clinic.id)
         .eq("owner_id", OWNER_ID)
         .order("due_at", { ascending:true });
@@ -1774,6 +1812,7 @@ function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailT
             clinic_id:String(row.clinic_id),
             due_at:String(row.due_at || ""),
             status:String(row.status || ""),
+            title:String(row.title || ""),
             description:String(row.description || ""),
             created_at:String(row.created_at || ""),
           }
