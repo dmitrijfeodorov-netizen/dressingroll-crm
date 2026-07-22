@@ -1155,6 +1155,15 @@ export default function Home(){
             <pre className="emailBox">{getTodayQueueEmailPreview(current)}</pre>
             <div className="leadActions">
               {current.website&&<a href={current.website} target="_blank">Open Website</a>}
+              {normalizeStatusValue(current.status)==="replied"&&<>
+                <button onClick={()=>updateClinic(current.id,(clinic)=>({...clinic,status:"interested"}))}>Interested</button>
+                <button onClick={()=>{
+                  const ok = window.confirm("Mark this clinic as not interested?");
+                  if(!ok) return;
+                  void updateClinic(current.id,(clinic)=>({...clinic,status:"not_interested"}));
+                }}>Not interested</button>
+                <button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>
+              </>}
               {current.email&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
               <button onClick={()=>setQueueIndex(i=>i+1)}>Skip</button>
               <button onClick={()=>setSelectedId(current.id)}>Open Clinic Card</button>
