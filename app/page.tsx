@@ -1040,11 +1040,31 @@ export default function Home(){
     const rule = WORKFLOW_ACTIONS[action];
     const occurredAt = new Date().toISOString();
 
-    const { error: clinicError } = await supabase
-      .from("clinics")
-      .update({ status: rule.status })
-      .eq("id", clinic.id)
-      .eq("owner_id", OWNER_ID);
+    let clinicError: any = null;
+
+    if(action==="sample_sent"){
+      const { data, error } = await supabase
+        .from("clinics")
+        .update({ status: rule.status })
+        .eq("id", clinic.id)
+        .eq("owner_id", OWNER_ID)
+        .eq("status", "sample_requested")
+        .select("id")
+        .maybeSingle();
+
+      clinicError = error;
+      if(!clinicError && !data){
+        alert("Sample was already marked as sent.");
+        return;
+      }
+    } else {
+      const { error } = await supabase
+        .from("clinics")
+        .update({ status: rule.status })
+        .eq("id", clinic.id)
+        .eq("owner_id", OWNER_ID);
+      clinicError = error;
+    }
 
     if(clinicError){
       console.error("Unable to update clinic status:", {
