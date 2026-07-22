@@ -98,6 +98,69 @@ function normalizeSearchText(input: string) {
   return input.toLowerCase().replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function extractFirstEmail(input: string | null | undefined) {
+  if (!input) return "";
+  const match = String(input)
+    .toLowerCase()
+    .match(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i);
+  return match?.[0] ? normalizeEmailAddress(match[0]) : "";
+}
+
+function hasDsnHeaders(headers: HeaderMap) {
+  const dsnHeaderNames = [
+    "final-recipient",
+    "original-recipient",
+    "diagnostic-code",
+    "reporting-mta",
+    "action",
+    "status",
+    "remote-mta",
+    "x-failed-recipients",
+  ];
+
+  return dsnHeaderNames.some((name) => Boolean(String(headers[name] || "").trim()));
+}
+
+function looksBounceMessage(headers: HeaderMap, subject: string) {
+  const fromHeader = String(headers["from"] || "").toLowerCase();
+  const fromLooksBounce = fromHeader.includes("mailer-daemon") || fromHeader.includes("postmaster");
+
+  const normalizedSubject = subject.toLowerCase();
+  const subjectLooksBounce =
+    normalizedSubject.includes("delivery failure") ||
+    normalizedSubject.includes("undeliverable") ||
+    normalizedSubject.includes("delivery status notification");
+
+  return fromLooksBounce || subjectLooksBounce || hasDsnHeaders(headers);
+}
+
+function extractBounceRecipient(headers: HeaderMap, bodyText: string) {
+  const headerCandidates = [
+    headers["x-failed-recipients"],
+    headers["final-recipient"],
+    headers["original-recipient"],
+  ];
+
+  for (const candidate of headerCandidates) {
+    const email = extractFirstEmail(candidate);
+    if (email) return email;
+  }
+
+  const bodyCandidates = [
+    /final-recipient:\s*(?:rfc822;)?\s*([^\s;<>]+@[^\s;<>]+)/i,
+    /original-recipient:\s*(?:rfc822;)?\s*([^\s;<>]+@[^\s;<>]+)/i,
+    /x-failed-recipients:\s*([^\s;<>]+@[^\s;<>]+)/i,
+  ];
+
+  for (const pattern of bodyCandidates) {
+    const match = bodyText.match(pattern);
+    const email = extractFirstEmail(match?.[1] || "");
+    if (email) return email;
+  }
+
+  return "";
+}
+
 function hasStrongAutoAckBodyPhrase(bodyText: string) {
   const normalized = normalizeSearchText(bodyText);
   if (!normalized) return false;
@@ -307,6 +370,143 @@ async function runGmailSync(sessionEmail?: string) {
 
       if (existingInbound?.id) {
         ignored += 1;
+        continue;
+      }
+
+      const isBounceMessage = looksBounceMessage(headers, subject);
+      if (isBounceMessage) {
+        let bounceClinicId: string | null = null;
+
+        if (gmailThreadId) {
+          const { data: threadRows, error: threadLookupError } = await supabaseAdmin
+            .from("email_messages")
+            .select("clinic_id, direction, status")
+            .eq("owner_id", CRM_OWNER_ID)
+            .eq("gmail_thread_id", gmailThreadId)
+            .order("sent_at", { ascending: false, nullsFirst: false })
+            .order("created_at", { ascending: false })
+            .limit(10);
+
+          if (threadLookupError) {
+            throw new Error(`Bounce thread lookup failed: ${threadLookupError.message}`);
+          }
+
+          const outboundClinicIds = [
+            ...new Set(
+              (threadRows || [])
+                .filter((row: any) => row?.clinic_id && (row?.direction === "outbound" || (!row?.direction && row?.status === "sent")))
+                .map((row: any) => String(row.clinic_id))
+            ),
+          ];
+
+          if (outboundClinicIds.length === 1) {
+            bounceClinicId = outboundClinicIds[0];
+          }
+        }
+
+        if (!bounceClinicId) {
+          const failedRecipient = extractBounceRecipient(headers, combinedBodyText);
+          if (failedRecipient) {
+            const { data: recipientRows, error: recipientLookupError } = await supabaseAdmin
+              .from("email_messages")
+              .select("clinic_id")
+              .eq("owner_id", CRM_OWNER_ID)
+              .eq("direction", "outbound")
+              .ilike("recipient", failedRecipient)
+              .limit(10);
+
+            if (recipientLookupError) {
+              throw new Error(`Bounce recipient lookup failed: ${recipientLookupError.message}`);
+            }
+
+            const recipientClinicIds = [
+              ...new Set((recipientRows || []).map((row: any) => String(row?.clinic_id || "")).filter(Boolean)),
+            ];
+
+            if (recipientClinicIds.length === 1) {
+              bounceClinicId = recipientClinicIds[0];
+            }
+          }
+        }
+
+        if (!bounceClinicId) {
+          console.warn("Bounce ignored: clinic could not be matched uniquely", {
+            gmailMessageId,
+            gmailThreadId,
+            sender,
+            hasDsn: hasDsnHeaders(headers),
+            subjectSample: subject.slice(0, 120),
+          });
+          ignored += 1;
+          continue;
+        }
+
+        const nowIso = new Date().toISOString();
+
+        const { error: bounceInsertError } = await supabaseAdmin.from("email_messages").insert({
+          owner_id: CRM_OWNER_ID,
+          clinic_id: bounceClinicId,
+          contact_id: null,
+          template_id: null,
+          recipient,
+          sender,
+          subject,
+          body_html: bodies.htmlBody || null,
+          body_text: bodies.textBody || null,
+          gmail_message_id: gmailMessageId,
+          gmail_thread_id: gmailThreadId,
+          direction: "inbound",
+          received_at: receivedAt,
+          processing_status: "processed",
+          processed_at: nowIso,
+          status: "received",
+          sent_at: null,
+          created_at: nowIso,
+        });
+
+        if (bounceInsertError) {
+          if (bounceInsertError.code === "23505") {
+            ignored += 1;
+            continue;
+          }
+          throw new Error(`Bounce inbound insert failed: ${bounceInsertError.message}`);
+        }
+
+        inserted += 1;
+
+        const { error: bounceClinicError } = await supabaseAdmin
+          .from("clinics")
+          .update({ status: "invalid_contact" })
+          .eq("id", bounceClinicId)
+          .eq("owner_id", CRM_OWNER_ID);
+
+        if (bounceClinicError) {
+          throw new Error(`Bounce clinic update failed: ${bounceClinicError.message}`);
+        }
+
+        const { error: bounceActivityError } = await supabaseAdmin.from("activities").insert({
+          owner_id: CRM_OWNER_ID,
+          clinic_id: bounceClinicId,
+          activity_type: "email_bounced",
+          description: "Delivery failure received",
+          occurred_at: receivedAt,
+        });
+
+        if (bounceActivityError) {
+          throw new Error(`Bounce activity insert failed: ${bounceActivityError.message}`);
+        }
+
+        const { error: bounceFollowUpError } = await supabaseAdmin
+          .from("follow_ups")
+          .update({ status: "completed" })
+          .eq("owner_id", CRM_OWNER_ID)
+          .eq("clinic_id", bounceClinicId)
+          .in("status", ["pending", "overdue"]);
+
+        if (bounceFollowUpError) {
+          throw new Error(`Bounce follow-up completion failed: ${bounceFollowUpError.message}`);
+        }
+
         continue;
       }
 
