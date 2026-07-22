@@ -328,11 +328,22 @@ async function runGmailSync(sessionEmail?: string) {
         continue;
       }
 
-      const full = await gmail.users.messages.get({
-        userId: "me",
-        id: messageId,
-        format: "full",
-      });
+      let full;
+      try {
+        full = await gmail.users.messages.get({
+          userId: "me",
+          id: messageId,
+          format: "full",
+        });
+      } catch (error: any) {
+        const statusCode = Number(error?.code || error?.response?.status || 0);
+        if (statusCode === 404) {
+          console.warn("Gmail message not found during sync", { messageId });
+          ignored += 1;
+          continue;
+        }
+        throw error;
+      }
 
       const gmailMessageId = String(full.data.id || messageId);
       const gmailThreadId = full.data.threadId ? String(full.data.threadId) : null;
