@@ -387,7 +387,10 @@ export async function POST(request: NextRequest) {
       sentAt: nowIso,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown Gmail send error";
+    const message =
+      error instanceof Error && error.message.startsWith("Gmail send failed")
+        ? error.message
+        : "Unknown Gmail send error";
 
     if (!gmailSendConfirmed) {
       if (clinicSendingReserved) {
