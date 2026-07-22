@@ -146,6 +146,36 @@ function normalizeEmail(raw: string) {
   return raw.trim().toLowerCase();
 }
 
+function isPlaceholderEmail(email: string): boolean {
+  const lower = String(email || "").trim().toLowerCase();
+  const atIndex = lower.indexOf("@");
+  const localPartRaw = atIndex >= 0 ? lower.slice(0, atIndex) : lower;
+  const localPart = localPartRaw.trim();
+  if (!localPart) return true;
+
+  const normalizedLocal = localPart.replace(/[._-]+/g, "");
+  const blockedLocals = new Set([
+    "johndoe",
+    "janedoe",
+    "firstname",
+    "lastname",
+    "firstlast",
+    "firstnamelastname",
+    "yourname",
+    "example",
+    "test",
+    "testing",
+    "user",
+    "username",
+    "email",
+    "name",
+    "first",
+    "last",
+  ]);
+
+  return blockedLocals.has(normalizedLocal);
+}
+
 function isRejectedEmail(email: string) {
   const lower = email.toLowerCase();
   const [local, domain] = lower.split("@");
@@ -153,6 +183,7 @@ function isRejectedEmail(email: string) {
 
   if (lower === "info@dressingroll.co.uk") return true;
   if (local.includes("noreply") || local.includes("no-reply")) return true;
+  if (isPlaceholderEmail(lower)) return true;
   if (local.includes("example") || local.includes("test")) return true;
   if (domain.includes("example") || domain.includes("test")) return true;
 
