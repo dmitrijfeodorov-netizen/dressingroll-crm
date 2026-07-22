@@ -1230,13 +1230,13 @@ export default function Home(){
           </section>
 
           <section className="metricGrid">
-            <Metric label="Ready to email" value={metrics.ready} note="Available leads"/>
-            <Metric label="Emails sent" value={metrics.sent} note="Waiting for reply"/>
-            <Metric label="Follow-ups due" value={metrics.follow} note="Action required"/>
-            <Metric label="Replies" value={metrics.replies} note="Active conversations"/>
-            <Metric label="Samples" value={metrics.samples} note="Evaluation stage"/>
-            <Metric label="Customers" value={metrics.customers} note="Paid accounts"/>
-            <Metric label="Pending email candidates" value={pendingCandidates.length} note="Need review"/>
+            <Metric label="Ready to email" value={metrics.ready} note="Available leads" onClick={metrics.ready>0 ? buildQueue : undefined} disabled={metrics.ready===0}/>
+            <Metric label="Emails sent" value={metrics.sent} note="Waiting for reply" onClick={metrics.sent>0 ? ()=>{ setSection("clinics"); setStatusFilter("email_sent"); } : undefined} disabled={metrics.sent===0}/>
+            <Metric label="Follow-ups due" value={metrics.follow} note="Action required" onClick={metrics.follow>0 ? buildQueue : undefined} disabled={metrics.follow===0}/>
+            <Metric label="Replies" value={metrics.replies} note="Active conversations" onClick={metrics.replies>0 ? buildQueue : undefined} disabled={metrics.replies===0}/>
+            <Metric label="Samples" value={metrics.samples} note="Evaluation stage" onClick={metrics.samples>0 ? ()=>setSection("samples") : undefined} disabled={metrics.samples===0}/>
+            <Metric label="Customers" value={metrics.customers} note="Paid accounts" onClick={metrics.customers>0 ? ()=>setSection("customers") : undefined} disabled={metrics.customers===0}/>
+            <Metric label="Pending email candidates" value={pendingCandidates.length} note="Need review" onClick={pendingCandidates.length>0 ? ()=>{ document.getElementById("pending-email-candidates")?.scrollIntoView({ behavior:"smooth", block:"start" }); } : undefined} disabled={pendingCandidates.length===0}/>
           </section>
 
           <section className="twoCol">
@@ -1255,7 +1255,7 @@ export default function Home(){
             </div>
           </section>
 
-          <section className="panel">
+          <section className="panel" id="pending-email-candidates">
             <div className="panelHead"><h3>Pending email candidates</h3><span>{pendingCandidates.length}</span></div>
             {pendingCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{pendingCandidatesError}</p>}
             {pendingCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{pendingCandidatesMessage}</p>}
@@ -1349,7 +1349,13 @@ export default function Home(){
   </div>;
 }
 
-function Metric({label,value,note}:{label:string,value:number,note:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{note}</small></div>}
+function Metric({label,value,note,onClick,disabled}:{label:string,value:number,note:string,onClick?:()=>void,disabled?:boolean}){
+  const isInteractive = Boolean(onClick) && !disabled;
+  if(isInteractive){
+    return <button type="button" className="metric" onClick={onClick} style={{textAlign:"left",cursor:"pointer"}}><span>{label}</span><strong>{value}</strong><small>{note}</small></button>;
+  }
+  return <div className="metric" style={{opacity:0.85}}><span>{label}</span><strong>{value}</strong><small>{note}</small></div>;
+}
 function ActionRow({label,value,onClick}:{label:string,value:number,onClick?:()=>void}){return <button type="button" className="actionRow" onClick={onClick} disabled={!onClick} style={{width:"100%",textAlign:"left",cursor:onClick?"pointer":"default",opacity:onClick?1:0.85}}><span>{label}</span><b>{value}</b></button>}
 function Funnel({label,value,max}:{label:string,value:number,max:number}){const width=max?Math.max(3,(value/max)*100):3;return <div className="funnel"><div><span>{label}</span><b>{value}</b></div><div className="track"><i style={{width:`${width}%`}}/></div></div>}
 function Detail({label,value}:{label:string,value:string}){return <div><span>{label}</span><b>{value}</b></div>}
