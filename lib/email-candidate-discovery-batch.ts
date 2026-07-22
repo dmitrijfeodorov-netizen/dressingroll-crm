@@ -11,6 +11,7 @@ export const SERPER_BUDGET_LIMIT = 5;
 type ClinicRow = {
   id: string;
   clinic_name: string | null;
+  clinic_type: string | null;
   email: string | null;
   website: string | null;
 };
@@ -47,12 +48,23 @@ export type EmailCandidateDiscoveryBatchResult = {
 
 async function loadClinicWindow(afterClinicId: string | null) {
   const supabaseAdmin = getSupabaseAdmin();
+  const relevanceFilter = [
+    "clinic_name.ilike.*podiatr*",
+    "clinic_name.ilike.*chiropod*",
+    "clinic_name.ilike.*foot*",
+    "clinic_name.ilike.*feet*",
+    "clinic_type.ilike.*podiatr*",
+    "clinic_type.ilike.*chiropod*",
+    "clinic_type.ilike.*foot*",
+    "clinic_type.ilike.*feet*",
+  ].join(",");
 
   let query = supabaseAdmin
     .from("clinics")
-    .select("id, clinic_name, email, website")
+    .select("id, clinic_name, clinic_type, email, website")
     .eq("owner_id", CRM_OWNER_ID)
     .or("email.is.null,email.eq.")
+    .or(relevanceFilter)
     .not("website", "is", null)
     .neq("website", "")
     .order("id", { ascending: true })
