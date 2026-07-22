@@ -501,6 +501,7 @@ export default function Home(){
   const [pendingCandidatesError,setPendingCandidatesError]=useState("");
   const [pendingCandidatesMessage,setPendingCandidatesMessage]=useState("");
   const [pendingActionId,setPendingActionId]=useState<string|null>(null);
+  const [pendingBatchSearching,setPendingBatchSearching]=useState(false);
 
   async function refreshAllData(withLoading=false){
     if(withLoading) setLoaded(false);
@@ -599,6 +600,37 @@ export default function Home(){
       setPendingCandidatesError(error instanceof Error ? error.message : "Unable to load pending email candidates.");
     } finally {
       setPendingCandidatesLoading(false);
+    }
+  }
+
+  async function findMoreEmailCandidates(){
+    if(pendingBatchSearching) return;
+
+    setPendingBatchSearching(true);
+    setPendingCandidatesError("");
+    setPendingCandidatesMessage("");
+
+    try {
+      const response = await fetch("/api/email-candidates/discover-batch", {
+        method:"POST",
+        credentials:"include",
+      });
+
+      const payload = await response.json().catch(()=>({}));
+      if(!response.ok){
+        setPendingCandidatesError(String(payload?.error || "Unable to run email discovery batch."));
+        return;
+      }
+
+      const processed = Number(payload?.processed || 0);
+      const inserted = Number(payload?.inserted || 0);
+      setPendingCandidatesMessage(`Processed ${processed} clinics, inserted ${inserted} candidates.`);
+
+      await refreshAllData(false);
+    } catch (error) {
+      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to run email discovery batch.");
+    } finally {
+      setPendingBatchSearching(false);
     }
   }
 
@@ -1348,7 +1380,7 @@ export default function Home(){
           </section>
 
           <section className="panel" id="pending-email-candidates">
-            <div className="panelHead"><h3>Pending email candidates</h3><span>{pendingCandidates.length}</span></div>
+            <div className="panelHead"><h3>Pending email candidates</h3><div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}><button type="button" className="primary" onClick={findMoreEmailCandidates} disabled={pendingBatchSearching || pendingActionId!==null}>{pendingBatchSearching?"Searching...":"Find more emails"}</button><span>{pendingCandidates.length}</span></div></div>
             {pendingCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{pendingCandidatesError}</p>}
             {pendingCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{pendingCandidatesMessage}</p>}
             {pendingCandidatesLoading ? <p className="muted">Loading pending email candidates…</p>
