@@ -1129,6 +1129,21 @@ export default function Home(){
         alert("Sample was already marked as sent.");
         return;
       }
+    } else if(action==="quote_sent"){
+      const { data, error } = await supabase
+        .from("clinics")
+        .update({ status: rule.status })
+        .eq("id", clinic.id)
+        .eq("owner_id", OWNER_ID)
+        .in("status", ["interested", "sample_requested", "sample_sent"])
+        .select("id")
+        .maybeSingle();
+
+      clinicError = error;
+      if(!clinicError && !data){
+        alert("Quote was already marked as sent or the clinic is not ready for a quote.");
+        return;
+      }
     } else {
       const { error } = await supabase
         .from("clinics")
