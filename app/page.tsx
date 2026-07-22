@@ -923,7 +923,10 @@ export default function Home(){
   }
 
   useEffect(()=>{
-    if(!current || normalizeStatusValue(current.status)!=="replied"){
+    const normalizedStatus = current ? normalizeStatusValue(current.status) : "";
+    const shouldShowReceivedReply = normalizedStatus==="replied" || normalizedStatus==="interested";
+
+    if(!current || !shouldShowReceivedReply){
       setQueueReply(null);
       setQueueReplyLoading(false);
       setQueueReplyError("");
@@ -1214,8 +1217,8 @@ export default function Home(){
           :queueIndex>=queue.length||!current?<div className="emptyCard"><h2>Queue complete</h2><p>All selected actions have been processed.</p><button className="primary" onClick={()=>setSection("dashboard")}>Return to Dashboard</button></div>
           :<div className="leadCard">
             <div className="leadTop"><div><span className="counter">{queueIndex+1} / {queue.length}</span><h2>{current.name}</h2><p>{current.services||"Podiatry clinic"}</p></div><span className="priority">Priority {current.priority}</span></div>
-            <div className="details"><Detail label="Email" value={current.email||"Missing"}/><Detail label="City" value={current.city}/><Detail label="Status" value={formatStatusLabel(current.status)}/><Detail label="Next action" value={current.nextAction}/></div>
-            {normalizeStatusValue(current.status)==="replied"
+            <div className="details"><Detail label="Email" value={current.email||"Missing"}/><Detail label="City" value={current.city}/><Detail label="Status" value={formatStatusLabel(current.status)}/><Detail label="Next action" value={nextActionForClinic(current)}/></div>
+            {(normalizeStatusValue(current.status)==="replied" || normalizeStatusValue(current.status)==="interested")
               ? <div className="emailBox" style={{whiteSpace:"pre-wrap"}}>
                 <b>Received reply</b>
                 {queueReplyLoading ? <p>Loading reply...</p>
@@ -1240,7 +1243,8 @@ export default function Home(){
                 }}>Not interested</button>
                 <button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>
               </>}
-              {current.email&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
+              {normalizeStatusValue(current.status)==="interested"&&<button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>}
+              {current.email&&normalizeStatusValue(current.status)!=="replied"&&normalizeStatusValue(current.status)!=="interested"&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
               <button onClick={()=>setQueueIndex(i=>i+1)}>Skip</button>
               <button onClick={()=>setSelectedId(current.id)}>Open Clinic Card</button>
             </div>
