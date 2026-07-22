@@ -179,11 +179,33 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let cleanupWarning = "";
+  const { error: cleanupError } = await supabaseAdmin
+    .from("clinic_email_candidates")
+    .update({ status: "rejected", reviewed_at: reviewedAt })
+    .eq("owner_id", CRM_OWNER_ID)
+    .eq("clinic_id", candidate.clinic_id)
+    .eq("status", "pending")
+    .neq("id", candidate.id);
+
+  if (cleanupError) {
+    console.error("Unable to cleanup remaining pending candidates after approve:", {
+      message: cleanupError.message,
+      details: cleanupError.details,
+      hint: cleanupError.hint,
+      code: cleanupError.code,
+      clinic_id: candidate.clinic_id,
+      candidate_id: candidate.id,
+    });
+    cleanupWarning = "Approved candidate was saved, but remaining pending candidates could not be auto-rejected.";
+  }
+
   return NextResponse.json({
     ok: true,
     message: "Candidate approved and clinic email saved.",
     statusChanged,
     clinic: updatedClinic,
     candidate: updatedCandidate,
+    ...(cleanupWarning ? { cleanupWarning } : {}),
   });
 }
