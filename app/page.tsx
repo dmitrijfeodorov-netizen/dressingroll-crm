@@ -366,6 +366,34 @@ function dateOnly(value:string){
   return (value || "").slice(0,10);
 }
 
+function uniqueClinicIds(groups:Clinic[][]){
+  const seen = new Set<string>();
+  const ids:string[] = [];
+
+  for (const group of groups) {
+    for (const clinic of group) {
+      if (seen.has(clinic.id)) continue;
+      seen.add(clinic.id);
+      ids.push(clinic.id);
+    }
+  }
+
+  return ids;
+}
+
+const TODAY_QUEUE_NEW_LEADS_LIMIT = 25;
+
+function buildTodayQueueIds(clinics:Clinic[]){
+  const repliesOrInterested = clinics.filter((clinic)=>clinic.status==="replied" || clinic.status==="interested");
+  const followUpsDue = clinics.filter((clinic)=>clinic.status==="follow_up_due");
+  const readyToEmail = clinics
+    .filter((clinic)=>clinic.status==="ready_to_email")
+    .slice(0, TODAY_QUEUE_NEW_LEADS_LIMIT);
+
+  // Deduplicate by clinic id across all groups while preserving group order.
+  return uniqueClinicIds([repliesOrInterested, followUpsDue, readyToEmail]);
+}
+
 function isOverdueFollowUp(followUp:FollowUp){
   return OPEN_FOLLOW_UP_STATUSES.has(followUp.status) && dateOnly(followUp.due_at) < iso();
 }
@@ -886,9 +914,9 @@ export default function Home(){
   }
 
   function buildQueue(){
-    const due=clinics.filter(c=>c.status==="follow_up_due");
-    const fresh=clinics.filter(c=>c.status==="ready_to_email").slice(0,25);
-    setQueue([...new Set([...due,...fresh].map(c=>c.id))]);setQueueIndex(0);setSection("today");
+    setQueue(buildTodayQueueIds(clinics));
+    setQueueIndex(0);
+    setSection("today");
   }
 
   async function openGmail(c: Clinic) {
@@ -1093,10 +1121,10 @@ export default function Home(){
 
           <section className="twoCol">
             <div className="panel"><div className="panelHead"><h3>Today's priorities</h3><span>Live</span></div>
-              <ActionRow label="Answer replies first" value={metrics.replies}/>
+              <ActionRow label="Answer replies first" value={metrics.replies} onClick={metrics.replies>0 ? buildQueue : undefined}/>
               <ActionRow label="Process sample requests" value={metrics.samples}/>
               <ActionRow label="Send follow-ups" value={metrics.follow}/>
-              <ActionRow label="Send new first-contact emails" value={Math.min(25,metrics.ready)}/>
+              <ActionRow label="Send new first-contact emails" value={Math.min(TODAY_QUEUE_NEW_LEADS_LIMIT,metrics.ready)}/>
             </div>
             <div className="panel"><div className="panelHead"><h3>Conversion pipeline</h3><span>{metrics.total} clinics</span></div>
               <Funnel label="Ready" value={metrics.ready} max={metrics.total}/>
@@ -1176,7 +1204,7 @@ export default function Home(){
 }
 
 function Metric({label,value,note}:{label:string,value:number,note:string}){return <div className="metric"><span>{label}</span><strong>{value}</strong><small>{note}</small></div>}
-function ActionRow({label,value}:{label:string,value:number}){return <div className="actionRow"><span>{label}</span><b>{value}</b></div>}
+function ActionRow({label,value,onClick}:{label:string,value:number,onClick?:()=>void}){return <button type="button" className="actionRow" onClick={onClick} disabled={!onClick} style={{width:"100%",textAlign:"left",cursor:onClick?"pointer":"default",opacity:onClick?1:0.85}}><span>{label}</span><b>{value}</b></button>}
 function Funnel({label,value,max}:{label:string,value:number,max:number}){const width=max?Math.max(3,(value/max)*100):3;return <div className="funnel"><div><span>{label}</span><b>{value}</b></div><div className="track"><i style={{width:`${width}%`}}/></div></div>}
 function Detail({label,value}:{label:string,value:string}){return <div><span>{label}</span><b>{value}</b></div>}
 
