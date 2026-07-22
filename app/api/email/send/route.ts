@@ -387,10 +387,24 @@ export async function POST(request: NextRequest) {
       sentAt: nowIso,
     });
   } catch (error) {
-    const message =
-      error instanceof Error && error.message.startsWith("Gmail send failed")
-        ? error.message
-        : "Unknown Gmail send error";
+    const normalizedError =
+      error instanceof Error
+        ? error
+        : (() => {
+            const status = Number((error as any)?.response?.status || (error as any)?.status || 0) || "unknown";
+            const code = String((error as any)?.code || (error as any)?.response?.data?.error?.code || "unknown");
+            const safeMessage = String(
+              (error as any)?.response?.data?.error?.message
+                || (error as any)?.message
+                || "Unknown Gmail send error"
+            );
+            const statusOrCode = status !== "unknown" ? status : code;
+            return new Error(`Gmail send failed (${statusOrCode}): ${safeMessage}`);
+          })();
+
+    const message = normalizedError.message.startsWith("Gmail send failed")
+      ? normalizedError.message
+      : "Unknown Gmail send error";
 
     if (!gmailSendConfirmed) {
       if (clinicSendingReserved) {
