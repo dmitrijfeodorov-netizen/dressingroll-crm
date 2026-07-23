@@ -1384,7 +1384,7 @@ export default function Home(){
           </section>
 
           <section className="panel" id="pending-email-candidates">
-            <div className="panelHead"><h3>Pending email candidates</h3><div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}><button type="button" onClick={openPendingCandidatesReview} disabled={pendingCandidatesLoading || pendingActionId!==null || pendingBatchSearching || pendingCandidates.length===0}>Review candidates</button><button type="button" className="primary" onClick={findMoreEmailCandidates} disabled={pendingBatchSearching || pendingActionId!==null}>{pendingBatchSearching?"Searching...":"Find more emails"}</button><span>{pendingCandidates.length}</span></div></div>
+            <div className="panelHead"><h3>Pending email candidates</h3><div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>{pendingCandidates.length>0&&<button type="button" className="primary" onClick={openPendingCandidatesReview} disabled={pendingCandidatesLoading || pendingActionId!==null || pendingBatchSearching}>Review candidates</button>}<button type="button" className="primary" onClick={findMoreEmailCandidates} disabled={pendingBatchSearching || pendingActionId!==null}>{pendingBatchSearching?"Searching...":"Find more emails"}</button><span>{pendingCandidates.length}</span></div></div>
             {pendingCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{pendingCandidatesError}</p>}
             {pendingCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{pendingCandidatesMessage}</p>}
             {pendingReviewOpen&&<div className="drawerSection" style={{marginTop:"0.75rem",padding:"1rem"}}>
