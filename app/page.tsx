@@ -502,6 +502,32 @@ export default function Home(){
   const [pendingCandidatesMessage,setPendingCandidatesMessage]=useState("");
   const [pendingActionId,setPendingActionId]=useState<string|null>(null);
   const [pendingBatchSearching,setPendingBatchSearching]=useState(false);
+  const [pendingReviewOpen,setPendingReviewOpen]=useState(false);
+  const [pendingReviewIndex,setPendingReviewIndex]=useState(0);
+
+  function scrollToPendingCandidates(){
+    document.getElementById("pending-email-candidates")?.scrollIntoView({ behavior:"smooth", block:"start" });
+  }
+
+  function openPendingCandidatesReview(){
+    setPendingCandidatesError("");
+    setPendingCandidatesMessage("");
+    setPendingReviewIndex(0);
+    setPendingReviewOpen(true);
+    scrollToPendingCandidates();
+  }
+
+  useEffect(()=>{
+    if(!pendingReviewOpen) return;
+    if(pendingCandidates.length===0){
+      setPendingReviewIndex(0);
+      return;
+    }
+
+    if(pendingReviewIndex>=pendingCandidates.length){
+      setPendingReviewIndex(pendingCandidates.length-1);
+    }
+  },[pendingReviewOpen, pendingCandidates.length, pendingReviewIndex]);
 
   async function refreshAllData(withLoading=false){
     if(withLoading) setLoaded(false);
@@ -634,18 +660,21 @@ export default function Home(){
     }
   }
 
-  async function approvePendingEmailCandidate(candidate:PendingEmailCandidate){
+  async function processPendingEmailCandidate(candidate:PendingEmailCandidate, action:"approve"|"reject", skipConfirm=false){
     if(pendingActionId) return;
 
-    const ok = window.confirm(`Approve ${candidate.email} for ${candidate.clinic_name || "this clinic"}?`);
-    if(!ok) return;
+    if(!skipConfirm){
+      const verb = action === "approve" ? "Approve" : "Reject";
+      const ok = window.confirm(`${verb} ${candidate.email} for ${candidate.clinic_name || "this clinic"}?`);
+      if(!ok) return;
+    }
 
     setPendingActionId(candidate.id);
     setPendingCandidatesError("");
-    setPendingCandidatesMessage("");
+    setPendingCandidatesMessage("Processing...");
 
     try {
-      const response = await fetch("/api/email-candidates/approve", {
+      const response = await fetch(action === "approve" ? "/api/email-candidates/approve" : "/api/email-candidates/reject", {
         method:"POST",
         credentials:"include",
         headers:{
@@ -656,60 +685,34 @@ export default function Home(){
 
       const payload = await response.json().catch(()=>({}));
       if(!response.ok){
-        setPendingCandidatesError(String(payload?.error || "Unable to approve email candidate."));
+        setPendingCandidatesError(String(payload?.error || `Unable to ${action} email candidate.`));
+        setPendingCandidatesMessage("");
         return;
       }
 
-      if(payload?.ok === false){
+      if(action === "approve" && payload?.ok === false){
         setPendingCandidatesMessage(String(payload?.message || "No changes were applied."));
         await loadPendingEmailCandidates();
         return;
       }
 
       setPendingCandidates((prev)=>prev.filter((item)=>item.id!==candidate.id));
-      setPendingCandidatesMessage(String(payload?.message || "Email candidate approved."));
+      setPendingCandidatesMessage(String(payload?.message || (action === "approve" ? "Email candidate approved." : "Email candidate rejected.")));
       await refreshAllData(false);
     } catch (error) {
-      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to approve email candidate.");
+      setPendingCandidatesError(error instanceof Error ? error.message : `Unable to ${action} email candidate.`);
+      setPendingCandidatesMessage("");
     } finally {
       setPendingActionId(null);
     }
   }
 
+  async function approvePendingEmailCandidate(candidate:PendingEmailCandidate){
+    await processPendingEmailCandidate(candidate, "approve", false);
+  }
+
   async function rejectPendingEmailCandidate(candidate:PendingEmailCandidate){
-    if(pendingActionId) return;
-
-    const ok = window.confirm(`Reject ${candidate.email} for ${candidate.clinic_name || "this clinic"}?`);
-    if(!ok) return;
-
-    setPendingActionId(candidate.id);
-    setPendingCandidatesError("");
-    setPendingCandidatesMessage("");
-
-    try {
-      const response = await fetch("/api/email-candidates/reject", {
-        method:"POST",
-        credentials:"include",
-        headers:{
-          "Content-Type":"application/json",
-        },
-        body:JSON.stringify({ candidateId: candidate.id }),
-      });
-
-      const payload = await response.json().catch(()=>({}));
-      if(!response.ok){
-        setPendingCandidatesError(String(payload?.error || "Unable to reject email candidate."));
-        return;
-      }
-
-      setPendingCandidates((prev)=>prev.filter((item)=>item.id!==candidate.id));
-      setPendingCandidatesMessage(String(payload?.message || "Email candidate rejected."));
-      await refreshAllData(false);
-    } catch (error) {
-      setPendingCandidatesError(error instanceof Error ? error.message : "Unable to reject email candidate.");
-    } finally {
-      setPendingActionId(null);
-    }
+    await processPendingEmailCandidate(candidate, "reject", false);
   }
 
   async function runMigrationSql(sql:string){
@@ -1361,7 +1364,7 @@ export default function Home(){
             <Metric label="Replies" value={metrics.replies} note="Active conversations" onClick={metrics.replies>0 ? buildQueue : undefined} disabled={metrics.replies===0}/>
             <Metric label="Samples" value={metrics.samples} note="Evaluation stage" onClick={metrics.samples>0 ? ()=>setSection("samples") : undefined} disabled={metrics.samples===0}/>
             <Metric label="Customers" value={metrics.customers} note="Paid accounts" onClick={metrics.customers>0 ? ()=>setSection("customers") : undefined} disabled={metrics.customers===0}/>
-            <Metric label="Pending email candidates" value={pendingCandidates.length} note="Need review" onClick={pendingCandidates.length>0 ? ()=>{ document.getElementById("pending-email-candidates")?.scrollIntoView({ behavior:"smooth", block:"start" }); } : undefined} disabled={pendingCandidates.length===0}/>
+            <Metric label="Pending email candidates" value={pendingCandidates.length} note="Need review" onClick={pendingCandidates.length>0 ? scrollToPendingCandidates : undefined} disabled={pendingCandidates.length===0}/>
           </section>
 
           <section className="twoCol">
@@ -1381,9 +1384,33 @@ export default function Home(){
           </section>
 
           <section className="panel" id="pending-email-candidates">
-            <div className="panelHead"><h3>Pending email candidates</h3><div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}><button type="button" className="primary" onClick={findMoreEmailCandidates} disabled={pendingBatchSearching || pendingActionId!==null}>{pendingBatchSearching?"Searching...":"Find more emails"}</button><span>{pendingCandidates.length}</span></div></div>
+            <div className="panelHead"><h3>Pending email candidates</h3><div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}><button type="button" onClick={openPendingCandidatesReview} disabled={pendingCandidatesLoading || pendingActionId!==null || pendingBatchSearching || pendingCandidates.length===0}>Review candidates</button><button type="button" className="primary" onClick={findMoreEmailCandidates} disabled={pendingBatchSearching || pendingActionId!==null}>{pendingBatchSearching?"Searching...":"Find more emails"}</button><span>{pendingCandidates.length}</span></div></div>
             {pendingCandidatesError&&<p className="muted" style={{color:"#9a2f2f"}}>{pendingCandidatesError}</p>}
             {pendingCandidatesMessage&&<p className="muted" style={{color:"#1f6f61"}}>{pendingCandidatesMessage}</p>}
+            {pendingReviewOpen&&<div className="drawerSection" style={{marginTop:"0.75rem",padding:"1rem"}}>
+              {pendingCandidates.length===0 ? <p className="muted" style={{margin:0}}>All email candidates reviewed</p>
+                : (()=>{
+                  const currentCandidate = pendingCandidates[pendingReviewIndex] || pendingCandidates[0];
+                  const currentIndex = Math.min(pendingReviewIndex, pendingCandidates.length-1);
+                  const processing = pendingActionId===currentCandidate.id;
+                  return <div style={{display:"grid",gap:"0.65rem"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",gap:"1rem",alignItems:"baseline"}}>
+                      <b>{currentCandidate.clinic_name || "Unknown clinic"}</b>
+                      <span className="muted">{currentIndex + 1} / {pendingCandidates.length}</span>
+                    </div>
+                    <p style={{margin:0}}><b>Email:</b> {currentCandidate.email || "—"}</p>
+                    <p style={{margin:0}}><b>Confidence:</b> {currentCandidate.confidence || "—"}</p>
+                    <p style={{margin:0}}><b>Clinic domain:</b> {websiteDomain(currentCandidate.website || "") || "—"}</p>
+                    <p style={{margin:0}}><b>Source:</b> {currentCandidate.source_url ? <a href={currentCandidate.source_url} target="_blank" rel="noopener noreferrer">{currentCandidate.source_url}</a> : "—"}</p>
+                    <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginTop:"0.25rem"}}>
+                      <button type="button" onClick={()=>{ if(currentCandidate.source_url) window.open(currentCandidate.source_url, "_blank", "noopener,noreferrer"); }} disabled={!currentCandidate.source_url || Boolean(pendingActionId)}>Open source</button>
+                      <button type="button" className="primary" onClick={()=>processPendingEmailCandidate(currentCandidate, "approve", true)} disabled={Boolean(pendingActionId)}>{processing?"Processing...":"Approve & Next"}</button>
+                      <button type="button" onClick={()=>processPendingEmailCandidate(currentCandidate, "reject", true)} disabled={Boolean(pendingActionId)}>{processing?"Processing...":"Reject & Next"}</button>
+                      <button type="button" onClick={()=>setPendingReviewOpen(false)} disabled={Boolean(pendingActionId)}>Close</button>
+                    </div>
+                  </div>;
+                })()}
+            </div>}
             {pendingCandidatesLoading ? <p className="muted">Loading pending email candidates…</p>
               : pendingCandidates.length===0 ? <p className="muted">No pending email candidates.</p>
               : <div className="tablePanel" style={{marginTop:"0.75rem"}}><table><thead><tr><th>Clinic</th><th>Email</th><th>Confidence</th><th>Source</th><th>Date</th><th style={{width:"220px"}}>Actions</th></tr></thead><tbody>{pendingCandidates.map((candidate)=><tr key={candidate.id}><td><button type="button" onClick={()=>setSelectedId(candidate.clinic_id)} style={{padding:0,border:0,background:"none",color:"#1f6f61",textDecoration:"underline",cursor:"pointer",fontWeight:600}}>{candidate.clinic_name||"Unknown clinic"}</button>{candidate.website&&<small>{websiteDomain(candidate.website)}</small>}</td><td>{candidate.email||"—"}</td><td>{candidate.confidence||"—"}</td><td>{candidate.source_url?<a href={candidate.source_url} target="_blank" rel="noopener noreferrer">{candidate.source_url}</a>:"—"}</td><td>{candidate.created_at?new Date(candidate.created_at).toLocaleString():"—"}</td><td style={{display:"flex",gap:"0.5rem",flexWrap:"wrap"}}><button type="button" className="primary" onClick={()=>approvePendingEmailCandidate(candidate)} disabled={Boolean(pendingActionId)}>{pendingActionId===candidate.id?"Approving…":"Approve"}</button><button type="button" onClick={()=>rejectPendingEmailCandidate(candidate)} disabled={Boolean(pendingActionId)}>{pendingActionId===candidate.id?"Rejecting…":"Reject"}</button></td></tr>)}</tbody></table></div>}
