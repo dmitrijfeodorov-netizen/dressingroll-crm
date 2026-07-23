@@ -421,12 +421,20 @@ function uniqueClinicIds(groups:Clinic[][]){
 }
 
 const TODAY_QUEUE_NEW_LEADS_LIMIT = 25;
+const TODAY_QUEUE_ALLOWED_STATUSES = new Set(["replied", "interested", "follow_up_due", "ready_to_email"]);
+const TODAY_QUEUE_EXCLUDED_STATUSES = new Set(["sample_requested", "sample_sent", "quote_sent", "first_order", "customer"]);
 
 function buildTodayQueueIds(clinics:Clinic[]){
-  const repliesOrInterested = clinics.filter((clinic)=>clinic.status==="replied" || clinic.status==="interested");
-  const followUpsDue = clinics.filter((clinic)=>clinic.status==="follow_up_due");
+  const queueEligible = clinics.filter((clinic)=>{
+    const status = normalizeStatusValue(clinic.status);
+    if(TODAY_QUEUE_EXCLUDED_STATUSES.has(status)) return false;
+    return TODAY_QUEUE_ALLOWED_STATUSES.has(status);
+  });
+
+  const repliesOrInterested = queueEligible.filter((clinic)=>clinic.status==="replied" || clinic.status==="interested");
+  const followUpsDue = queueEligible.filter((clinic)=>clinic.status==="follow_up_due");
   const readyToEmail = clinics
-    .filter((clinic)=>clinic.status==="ready_to_email")
+    .filter((clinic)=>normalizeStatusValue(clinic.status)==="ready_to_email")
     .slice(0, TODAY_QUEUE_NEW_LEADS_LIMIT);
 
   // Deduplicate by clinic id across all groups while preserving group order.
@@ -1164,7 +1172,7 @@ export default function Home(){
       clinicError = error;
       if(!clinicError && !data){
         alert("Sample was already marked as sent.");
-        return;
+        return false;
       }
     } else if(action==="quote_sent"){
       const { data, error } = await supabase
@@ -1179,7 +1187,7 @@ export default function Home(){
       clinicError = error;
       if(!clinicError && !data){
         alert("Quote was already marked as sent or the clinic is not ready for a quote.");
-        return;
+        return false;
       }
     } else if(action==="first_order"){
       const { data, error } = await supabase
@@ -1194,7 +1202,7 @@ export default function Home(){
       clinicError = error;
       if(!clinicError && !data){
         alert("First order was already recorded or the clinic is not ready for this step.");
-        return;
+        return false;
       }
 
       if(!clinicError && data){
@@ -1232,7 +1240,7 @@ export default function Home(){
         code: clinicError.code,
       });
       alert(`Unable to update clinic status: ${clinicError.message}`);
-      return;
+      return false;
     }
 
     const { error: activityError } = await supabase
@@ -1253,7 +1261,7 @@ export default function Home(){
         code: activityError.code,
       });
       alert(`Unable to create activity: ${activityError.message}`);
-      return;
+      return false;
     }
 
     if(typeof rule.followUpDays === "number"){
@@ -1281,7 +1289,7 @@ export default function Home(){
           code: followUpError.code,
         });
         alert(`Unable to create follow-up: ${followUpError.message}`);
-        return;
+        return false;
       }
     }
 
@@ -1290,6 +1298,15 @@ export default function Home(){
     if(postSuccessWarning){
       alert(postSuccessWarning);
     }
+
+    return true;
+  }
+
+  async function requestSampleAndAdvanceQueue(clinic:Clinic){
+    const ok = await runWorkflowAction(clinic, "request_sample");
+    if(!ok) return;
+
+    setQueue((prev)=>prev.filter((id)=>id!==clinic.id));
   }
 
   function exportCsv(){
@@ -1449,9 +1466,9 @@ export default function Home(){
                   if(!ok) return;
                   void updateClinic(current.id,(clinic)=>({...clinic,status:"not_interested"}));
                 }}>Not interested</button>
-                <button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>
+                <button onClick={()=>requestSampleAndAdvanceQueue(current)}>Send sample</button>
               </>}
-              {normalizeStatusValue(current.status)==="interested"&&<button onClick={()=>runWorkflowAction(current,"request_sample")}>Send sample</button>}
+              {normalizeStatusValue(current.status)==="interested"&&<button onClick={()=>requestSampleAndAdvanceQueue(current)}>Send sample</button>}
               {normalizeStatusValue(current.status)==="sample_requested"&&<button onClick={()=>setSection("samples")}>Open Samples</button>}
               {current.email&&normalizeStatusValue(current.status)!=="replied"&&normalizeStatusValue(current.status)!=="interested"&&normalizeStatusValue(current.status)!=="sample_requested"&&<button className="primary" onClick={()=>openGmail(current)}>Send Email & Next</button>}
               <button onClick={()=>setQueueIndex(i=>i+1)}>Skip</button>
@@ -1512,7 +1529,7 @@ function ActionRow({label,value,onClick}:{label:string,value:number,onClick?:()=
 function Funnel({label,value,max}:{label:string,value:number,max:number}){const width=max?Math.max(3,(value/max)*100):3;return <div className="funnel"><div><span>{label}</span><b>{value}</b></div><div className="track"><i style={{width:`${width}%`}}/></div></div>}
 function Detail({label,value}:{label:string,value:string}){return <div><span>{label}</span><b>{value}</b></div>}
 
-function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailTemplates,onEmailSent}:{clinic:Clinic,onClose:()=>void,onUpdate:(c:Clinic)=>void,onQuick:(c:Clinic,action:WorkflowActionKey)=>Promise<void>,onFollowUpsChanged:()=>Promise<void>,emailTemplates:EmailTemplate[],onEmailSent:()=>Promise<void>}){
+function ClinicDrawer({clinic,onClose,onUpdate,onQuick,onFollowUpsChanged,emailTemplates,onEmailSent}:{clinic:Clinic,onClose:()=>void,onUpdate:(c:Clinic)=>void,onQuick:(c:Clinic,action:WorkflowActionKey)=>Promise<boolean>,onFollowUpsChanged:()=>Promise<void>,emailTemplates:EmailTemplate[],onEmailSent:()=>Promise<void>}){
   const[d,setD]=useState(clinic);
   const [workflowSaving,setWorkflowSaving]=useState(false);
   const [templatePickerOpen,setTemplatePickerOpen]=useState(false);
