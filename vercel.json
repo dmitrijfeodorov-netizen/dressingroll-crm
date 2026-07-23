@@ -5,6 +5,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/follow-ups",
+      "schedule": "0 9 * * *"
+    },
+    {
       "path": "/api/cron/email-candidates",
       "schedule": "0 8 * * *"
     }
